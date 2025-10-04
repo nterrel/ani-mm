@@ -54,10 +54,12 @@ def simulate_alanine_dipeptide(
     dict with keys: steps, final_potential_kjmol, temperature_K.
     """
     if openmm is None or app is None or unit is None:  # pragma: no cover
-        raise ImportError("OpenMM is required for simulate_alanine_dipeptide; install openmm first.")
+        raise ImportError(
+            "OpenMM is required for simulate_alanine_dipeptide; install openmm first.")
 
     # Build topology & system
-    pdb = app.PDBFile(app.internal.pdbx.PdbxDict.getPdbString(app.AmberPrmtopFile))  # placeholder? unrealistic
+    pdb = app.PDBFile(app.internal.pdbx.PdbxDict.getPdbString(
+        app.AmberPrmtopFile))  # placeholder? unrealistic
     # Simpler: use built-in AlanineDipeptide in OpenMM examples (not directly exposed). We'll construct from a sequence via Modeller.
     # Construct Ala dipeptide (ACE-ALA-NME). We can build using PeptideModeller style; easiest is to load from a PDB string.
     ala2_pdb_str = """

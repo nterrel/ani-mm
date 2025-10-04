@@ -30,7 +30,8 @@ def minimize_and_md(ase_atoms: Atoms, ani_model, n_steps: int = 1000, temperatur
 
     A future implementation will build an OpenMM System that queries ANI for forces.
     """
-    positions = np.repeat(np.expand_dims(ase_atoms.get_positions(), 0), repeats=2, axis=0)
+    positions = np.repeat(np.expand_dims(
+        ase_atoms.get_positions(), 0), repeats=2, axis=0)
     velocities = np.zeros_like(positions)
     time = np.array([0.0, n_steps * dt_fs * 1e-3])
     return MDState(positions=positions, velocities=velocities, time=time)
