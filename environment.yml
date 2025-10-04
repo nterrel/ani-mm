@@ -1,0 +1,14 @@
+name: ani-mm
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.10
+  - openmm=8.0.0
+  - ase
+  - rdkit
+  - pip
+  - pip:
+      - torch  # choose CUDA-specific wheel manually if needed
+      - torchani
+      - -e .[dev]

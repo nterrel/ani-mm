@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ani-mm"
+version = "0.1.0"
+description = "Hybrid ANI + OpenMM molecular modelling utilities"
+readme = "README.md"
+authors = [
+  { name = "Nick Terrel", email = "nickterrel4@gmail.com" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["molecular-dynamics", "openmm", "ani", "torchani", "ase"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Chemistry",
+]
+# Minimum core dependencies; torch installed separately to allow GPU-specific wheels.
+dependencies = [
+  "openmm>=8.0.0",
+  "ase>=3.22.1",
+  "torchani>=2.2",
+  "numpy>=1.23",
+  "typing-extensions>=4.5"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "ruff>=0.5.0",
+  "mypy>=1.7.0",
+  "black>=24.0.0",
+  "isort>=5.12.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/yourname/ani-mm"
+Issues = "https://github.com/yourname/ani-mm/issues"
+
+[project.scripts]
+ani-mm = "animm.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=animm --cov-report=term-missing"
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_unused_configs = true
+ignore_missing_imports = true
+strict_optional = true
