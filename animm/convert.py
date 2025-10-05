@@ -1,7 +1,7 @@
-"""Lightweight conversions -> ASE ``Atoms``.
+"""SMILES (and a few names) to ASE ``Atoms``.
 
-Primary function: ``smiles_to_ase`` using RDKit when present, else a limited
-fallback via ``ase.build.molecule``.
+Uses RDKit if available; otherwise falls back to ``ase.build.molecule`` which
+only knows a handful of common species. Good enough for small test systems.
 """
 
 from __future__ import annotations

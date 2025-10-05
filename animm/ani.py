@@ -1,13 +1,12 @@
-"""ANI model utilities.
+"""Small helper layer around TorchANI.
 
-Provides a thin, version‐stable layer over TorchANI to:
+What this does (and no more):
+* Load a named ANI model (case‑insensitive).
+* Hand you an ASE calculator wrapper.
+* Compute a single‑point energy + forces (Hartree, Hartree/Bohr).
 
-* Load a pretrained ANI model by name (case‑insensitive).
-* Produce an ASE calculator wrapper.
-* Evaluate single‐point energy and forces (Hartree, Hartree/Bohr).
-
-Currently supported model names: ``ANI2DR`` (default), ``ANI2X``. Additional
-models can be registered by extending ``MODEL_LOADERS``.
+Supported today: ``ANI2DR`` (default) and ``ANI2X``. To experiment with more,
+extend ``MODEL_LOADERS`` in your own code or a PR.
 """
 
 from __future__ import annotations

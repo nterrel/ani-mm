@@ -1,8 +1,8 @@
-"""Alanine dipeptide reference MD example (vacuum, ANI).
+"""Tiny alanine dipeptide (gas phase) demo.
 
-Prefers OpenMM + TorchForce (ANI) and falls back to a minimal ASE VelocityVerlet
-loop if the plugin is unavailable. Intended as a quick sanity / demo run, not a
-production workflow.
+Tries OpenMM + TorchForce first; if that path isn’t available it falls back to
+a bare‑bones ASE velocity Verlet loop. Intended for a quick sanity check, not
+benchmarking or production use.
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ def simulate_alanine_dipeptide(
     minimize: bool = True,
     live_view: bool = False,
     live_backend: str = "auto",
+    hold_open: bool = False,
 ) -> Dict[str, Any]:
     """Run a short gas‐phase alanine dipeptide simulation.
 
@@ -69,6 +70,8 @@ def simulate_alanine_dipeptide(
         If True, enable a lightweight live viewer (desktop). Optional.
     live_backend: str
         Backend for live viewer ('auto', 'ase', 'mpl').
+    hold_open: bool
+        If True and using matplotlib backend, block so window stays visible after run.
 
     Returns
     -------
@@ -191,6 +194,7 @@ END
                     interval=report_interval,
                     backend=live_backend,
                     initial_positions_ang=_np.asarray(initial_ang, dtype=float),
+                    hold_open=hold_open,
                 )
                 sim.reporters.append(live_reporter)
             except Exception:

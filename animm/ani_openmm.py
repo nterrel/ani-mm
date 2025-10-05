@@ -1,15 +1,12 @@
-"""OpenMM + TorchANI integration.
+"""Glue for building an OpenMM ``TorchForce`` from a TorchANI model.
 
-Builds an OpenMM ``TorchForce`` wrapping a TorchANI model traced to TorchScript
-so energies (and autograd forces) are available every MD step.
+We trace the selected ANI network with TorchScript once (per model / atom count /
+dtype) and reuse that graph inside OpenMM so forces are evaluated each step.
 
-Notes
------
-* Requires the ``openmm-torch`` plugin.
-* Both historical import names (``openmmtorch`` / ``openmm_torch``) are tried.
-* Traced modules are cached per (MODEL, NATOMS, DTYPE) to avoid repeated tracing.
-* Double precision is preferred; will fall back to float32 automatically if the
-    environment cannot trace the model in float64.
+Quick facts:
+* Needs the ``openmm-torch`` plugin (we try both import spellings).
+* Prefers a float64 trace; retries in float32 only if necessary.
+* Caches traces keyed by (MODEL, NATOMS, DTYPE) in‑process.
 """
 
 from __future__ import annotations

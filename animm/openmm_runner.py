@@ -1,14 +1,11 @@
-"""Reusable OpenMM MD driver for ANI potentials.
+"""Lightweight OpenMM MD loop for ANI potentials.
 
-Key features:
-* Single ``TorchForce`` (ANI) system construction.
-* Optional energy minimization.
-* Langevin integration with consistent per–step force evaluation.
-* Optional in‑memory trajectory capture and/or DCD output.
-* Final potential energy and temperature estimate (simple 3N DOF assumption).
+Focus: minimal setup, predictable defaults, optional trajectory capture.
+Builds a system with a single ANI ``TorchForce`` and runs Langevin dynamics.
+Collect positions in memory or write a DCD if you ask. Returns a small result
+object with final energy, temperature estimate, and (optionally) coordinates.
 
-``minimize_and_md`` is retained as a compatibility shim and will be deprecated
-in a future minor release.
+``minimize_and_md`` sticks around only for older callers; prefer ``run_ani_md``.
 """
 
 from __future__ import annotations
@@ -176,6 +173,7 @@ def run_ani_md(
     seed: int | None = None,
     live_view: bool = False,
     live_interval: int | None = None,
+    hold_open: bool = False,
 ) -> MDResult:
     """Run Langevin MD for an ASE ``Atoms`` object with an ANI potential.
 
@@ -216,6 +214,9 @@ def run_ani_md(
     live_interval : int | None
         Interval for live view updates. Defaults to ``report_interval`` if
         not provided.
+    hold_open : bool
+        If True and using the matplotlib viewer, keep window open (blocking)
+        at the end of the simulation until user closes it.
     """
     if openmm is None or app is None or unit is None:
         raise ImportError("OpenMM (and openmm-torch) required for run_ani_md")
@@ -269,7 +270,9 @@ def run_ani_md(
 
             lv_interval = int(live_interval) if live_interval else int(report_interval)
             symbols = ase_atoms.get_chemical_symbols()
-            live_viewer, live_reporter = build_live_viewer_reporter(symbols, interval=lv_interval)
+            live_viewer, live_reporter = build_live_viewer_reporter(
+                symbols, interval=lv_interval, hold_open=hold_open
+            )
             sim.reporters.append(live_reporter)
         except Exception:  # pragma: no cover - GUI optional
             live_viewer = None

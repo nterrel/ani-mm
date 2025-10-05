@@ -1,9 +1,8 @@
-"""CLI entry points.
+"""Command‑line interface.
 
-Environment knobs:
+Handy environment knobs:
 * ``ANIMM_NO_OMP=1`` – force single threading for common BLAS/OpenMP libs.
-* ``--allow-dup-omp`` – set ``KMP_DUPLICATE_LIB_OK=TRUE`` (escape hatch for
-    macOS duplicate libomp abort; prefer fixing the environment instead).
+* ``--allow-dup-omp`` – sets ``KMP_DUPLICATE_LIB_OK=TRUE`` (only if you really need to sidestep a macOS libomp clash).
 """
 
 from __future__ import annotations
@@ -107,6 +106,11 @@ def main(argv: list[str] | None = None):
         choices=["auto", "ase", "mpl"],
         help="Force live viewer backend (default auto)",
     )
+    p_ala2.add_argument(
+        "--live-hold",
+        action="store_true",
+        help="If set and using live viewer, keep window open after dynamics (blocks until closed)",
+    )
 
     p_models = sub.add_parser("models", help="List available ANI models")
     p_models.add_argument("--json", action="store_true", help="Emit JSON list")
@@ -175,6 +179,7 @@ def main(argv: list[str] | None = None):
                     minimize=not args.no_min,
                     live_view=args.live_view,
                     live_backend=args.live_backend,
+                    hold_open=args.live_hold,
                 )
             print(json.dumps(sim_info))
         else:
@@ -191,6 +196,7 @@ def main(argv: list[str] | None = None):
                 minimize=not args.no_min,
                 live_view=args.live_view,
                 live_backend=args.live_backend,
+                hold_open=args.live_hold,
             )
             extra = ""
             if "initial_potential_kjmol" in sim_info:
