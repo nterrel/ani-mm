@@ -1,6 +1,6 @@
 # User Guide
 
-This guide walks through common tasks using ani-mm.
+Common tasks with `ani-mm`.
 
 ## 1. Listing Available Models
 
@@ -88,7 +88,7 @@ See the API Reference for deeper details and the Development page if you plan to
 
 ## 10. Live Desktop Viewer (Experimental)
 
-You can open a lightweight live viewer window during MD:
+You can open a lightweight live viewer window during MD. Add `--live-hold` to keep Matplotlib open:
 
 Command line (alanine example):
 
@@ -108,10 +108,10 @@ res = run_ani_md(atoms, n_steps=500, live_view=True, live_interval=50)
 
 Backends:
 
-- auto – prefer ASE GUI if available, fallback to Matplotlib.
+* auto – prefer ASE GUI if available, then Matplotlib.
+* ase – force ASE GUI.
+* mpl – force Matplotlib scatter.
 
-- ase – force ASE GUI.
+Headless (no display) -> viewer auto‑disables.
 
-- mpl – force Matplotlib scatter.
-
-If no GUI backend is available (e.g. headless CI), it silently disables itself.
+See `Live Viewer` page for colors, troubleshooting, and performance notes.

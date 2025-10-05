@@ -11,8 +11,8 @@ atoms move while you debug.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol, Tuple, cast
 import sys
+from typing import Any, Optional, Protocol, Tuple, cast
 
 import numpy as np
 
@@ -52,6 +52,7 @@ _ASE_GUI_IMPORT_ERROR: Optional[str] = None
 try:  # ASE GUI optional dependency
     from ase import Atoms as _ASEAtoms  # type: ignore
     from ase.gui.gui import GUI as _ASEGUI  # type: ignore
+
     # Quick probe: some environments have ase + tkinter missing; ensure tkinter available
     try:  # pragma: no cover - environment specific
         import tkinter  # noqa: F401
@@ -169,7 +170,8 @@ class LiveTrajectoryViewer:
                 self.ax.scatter(  # type: ignore[call-arg]
                     x,
                     y,
-                    z,  # type: ignore[arg-type]  # 3D scatter accepts array-like
+                    # type: ignore[arg-type]  # 3D scatter accepts array-like
+                    z,
                     s=40,
                     depthshade=True,
                     c=self._colors if len(self._colors) == len(x) else None,
@@ -179,7 +181,8 @@ class LiveTrajectoryViewer:
             # Fast path: mutate existing scatter artist for stable colors
             try:
                 # 3D PathCollection stores data in _offsets3d tuple
-                self._scatter._offsets3d = (x, y, z)  # type: ignore[attr-defined]
+                # type: ignore[attr-defined]
+                self._scatter._offsets3d = (x, y, z)
             except Exception:
                 # Fallback: recreate scatter (should be rare)
                 try:
@@ -305,7 +308,8 @@ class _LiveViewerReporter:
         import openmm.unit as unit  # local import to avoid hard dependency earlier
 
         pos_nm = state.getPositions(asNumpy=True).value_in_unit(
-            unit.nanometer  # type: ignore[attr-defined]  # openmm unit symbols are dynamic
+            # type: ignore[attr-defined]  # openmm unit symbols are dynamic
+            unit.nanometer
         )
         self.viewer.update(np.asarray(pos_nm) * 10.0, self._step)  # nm -> Å
 
@@ -343,7 +347,7 @@ def build_live_viewer_reporter(
         else:
             chosen = "none"
     # Reusable disabled placeholder adhering to Protocol
-    
+
     class _DisabledViewerProto:
         enabled = False
 
@@ -360,7 +364,11 @@ def build_live_viewer_reporter(
         viewer = _ASEAtomsViewer(symbols, initial_positions_ang)
         # If ASE failed to enable (e.g., GUI toolkit missing), fall back to mpl
         if not getattr(viewer, "enabled", False) and _HAVE_MPL:
-            reason = getattr(viewer, "_disabled_reason", None) or _ASE_GUI_IMPORT_ERROR or "missing GUI toolkit"
+            reason = (
+                getattr(viewer, "_disabled_reason", None)
+                or _ASE_GUI_IMPORT_ERROR
+                or "missing GUI toolkit"
+            )
             hint = "Install a Tk or Qt binding (e.g. 'conda install tk' or ensure python was built with Tk)"
             print(
                 f"[ani-mm] ASE backend unavailable ({reason}); falling back to matplotlib.\n"

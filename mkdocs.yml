@@ -8,6 +8,7 @@ copyright: MIT
 nav:
   - Home: index.md
   - User Guide: user-guide.md
+  - Live Viewer: live-viewer.md
   - API Reference:
       - ANI Models: api/ani.md
       - OpenMM Integration: api/ani_openmm.md

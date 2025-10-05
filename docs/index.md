@@ -1,13 +1,14 @@
 # ani-mm
 
-Utilities for running ANI neural network potentials with OpenMM via the TorchForce plugin, plus convenience helpers for model evaluation, simple molecular dynamics, and conversion utilities.
+Utilities for running ANI neural network potentials with OpenMM (TorchForce) plus small helpers for model evaluation, SMILES conversion, and a minimal MD workflow.
 
 ## Highlights
 
-- Minimal surface area: focuses on ANI models only.
-- TorchScript tracing cache with automatic dtype fallback (float64 -> float32) for stability.
-- Simple molecular dynamics runner that reports energies, temperature, and supports optional trajectory capture.
-- Clean CLI for quick energy/forces evaluation, model listing, and an alanine dipeptide example run.
+* Lean scope: ANI models only (currently `ANI2DR`, `ANI2X`).
+* TorchScript tracing cache (float64 preferred, automatic float32 fallback).
+* Lightweight MD runner (+ optional in‑memory trajectory, DCD output).
+* Alanine dipeptide vacuum example with delta energy reporter.
+* Experimental live viewer (ASE GUI or Matplotlib) with `--live-hold`.
 
 ## Install
 
@@ -49,10 +50,11 @@ energy, forces = model.energy_forces(atoms)
 print(energy.item(), forces.shape)
 ```
 
-## Documentation Structure
+## Documentation Map
 
-- User Guide: practical usage patterns and CLI examples.
-- API Reference: auto-generated documentation of the public Python API.
-- Development: contributor workflow, testing, and release notes.
+* User Guide – practical CLI & programmatic recipes.
+* Live Viewer – backend selection, troubleshooting, hold flag.
+* API Reference – auto-generated public API.
+* Development – contributor workflow.
 
-See the roadmap in the project README for planned enhancements.
+Roadmap and caveats live in the top-level README.

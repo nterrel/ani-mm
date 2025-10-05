@@ -1,5 +1,208 @@
 # ani-mm
 
+Small, pragmatic helpers for using TorchANI ANI models with OpenMM (and ASE for a fallback or a GUI). Goal: stay lean: load a model, get energies/forces, drop it into an OpenMM `TorchForce`, run a quick MD loop, optionally watch atoms jiggle, then move on.
+
+Tested mainly on macOS (Apple Silicon) and Linux so far. Windows is untested.
+
+## Scope (what it really does)
+
+* Convert a SMILES string to an ASE `Atoms` (RDKit first, tiny fallback otherwise).
+* Load a named pretrained ANI model (`ANI2DR`, `ANI2X`).
+* Single‑point energy + forces (try float64 trace → fall back to float32 only if required).
+* Build a single OpenMM `TorchForce` hosting that trace; forces come from the NN each MD step.
+* Provide a “press go” alanine dipeptide vacuum example (`ala2-md`).
+* Generic `run_ani_md` (optional in‑memory trajectory or DCD file).
+* Live viewer (ASE GUI if available, otherwise Matplotlib 3D scatter) with `--live-hold` to keep the window open after the run.
+
+Not trying to be: a general workflow platform, a training suite, or a periodic variant of non‑periodic models (yet).
+
+## Install
+
+The repo vendors TorchANI as a submodule for reproducibility, but you can also grab TorchANI via the `ml` extra.
+
+### Fast path
+
+```bash
+git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
+cd ani-mm
+conda env create -f environment.yml
+conda activate ani-mm
+pip install -e .[dev,docs]
+```
+
+### Manual (Conda)
+
+```bash
+git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
+cd ani-mm
+conda create -n ani-mm python=3.10 -y
+conda activate ani-mm
+conda install -c conda-forge openmm openmm-torch ase rdkit pytorch -y
+pip install -e external/torchani
+pip install -e .[dev,docs]
+```
+
+### Pure pip
+
+```bash
+git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
+cd ani-mm
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install openmm openmm-torch ase torch rdkit-pypi
+pip install -e external/torchani
+pip install -e .[dev,docs]
+```
+
+### GitHub TorchANI (no submodule)
+
+```bash
+pip install .[ml]
+```
+
+### Update vendored TorchANI
+
+```bash
+git submodule update --remote external/torchani
+pip install -e external/torchani
+```
+
+### Pin a TorchANI commit
+
+```bash
+cd external/torchani
+git checkout <COMMIT_SHA>
+cd ../..
+pip install -e external/torchani
+```
+
+## Quick energy + forces
+
+```python
+from animm.ani import load_ani_model, ani_energy_forces
+from animm.convert import smiles_to_ase
+
+atoms = smiles_to_ase("CCO")
+model = load_ani_model("ANI2DR")
+res = ani_energy_forces(model, atoms)
+print(res.energy.item(), res.forces.shape)
+```
+
+## Alanine example (vacuum)
+
+Basic run:
+
+```bash
+ani-mm ala2-md --steps 1000 --t 300 --dt 2.0 --report 50
+```
+
+Write a DCD trajectory:
+
+```bash
+ani-mm ala2-md --steps 1000 --dcd traj.dcd
+```
+
+Live viewer (auto backend) and keep window open:
+
+```bash
+ani-mm ala2-md --steps 500 --live-view --live-backend auto --live-hold
+```
+
+Force Matplotlib viewer:
+
+```bash
+ani-mm ala2-md --steps 500 --live-view --live-backend mpl --live-hold
+```
+
+Force ASE GUI (falls back with a diagnostic if Tk/Qt missing):
+
+```bash
+ani-mm ala2-md --steps 500 --live-view --live-backend ase
+```
+
+## Live viewer quick facts
+
+* `auto` prefers ASE GUI, else Matplotlib, else disables silently (CI/headless).
+* Matplotlib colors by element (approx JMol palette + categorical fallback).
+* `--live-hold` only matters for Matplotlib (ASE GUI already persists).
+* ASE fallback messages include a hint if `tkinter` is missing.
+
+More details: `docs/live-viewer.md`.
+
+## Precision & tracing cache
+
+1. Attempt TorchScript trace in float64.
+2. On dtype mismatch, warn and retry float32.
+3. Cache by `(MODEL, NATOMS, DTYPE)`.
+4. Actual traced dtype recorded on the force as `_animm_traced_dtype`.
+
+Manual cache clear:
+
+```python
+from animm.ani_openmm import clear_traced_cache
+clear_traced_cache()
+```
+
+## Warning suppression
+
+Filters a few recurring lines (legacy `simtk.openmm` deprecation, experimental model notices). Remove the filters or set `PYTHONWARNINGS=default` to restore noise.
+
+## Limitations (current)
+
+* Vacuum only (no cutoff / periodic handling).
+* No restart or checkpoint logic.
+* Minimal reporting (stdout lines) in the example runner.
+* Single potential per system.
+
+## Roadmap (abridged)
+
+| Status | Item |
+| ------ | ---- |
+| ✅ | Energy/forces helpers |
+| ✅ | OpenMM TorchForce integration |
+| ✅ | Alanine MD example |
+| ✅ | Float64 trace + float32 fallback |
+| ✅ | Live viewer (ASE/Matplotlib) + `--live-hold` |
+| ⏳ | Periodic / cutoff support |
+| ⏳ | Rich reporters & logging |
+| ⏳ | Mixed precision knobs |
+| ⏳ | Restart / checkpoint |
+| ⏳ | More examples |
+
+## Tests
+
+```bash
+pytest -q
+```
+
+Coverage:
+
+```bash
+pytest --cov=animm --cov-report=term-missing
+```
+
+## Dev loop
+
+```bash
+ruff check .
+black --check .
+isort --check-only .
+pytest -q
+mkdocs serve
+```
+
+## Contributing
+
+Small, focused PRs welcome. Include/update tests if you change behavior; minimize unrelated formatting churn.
+
+## License
+
+MIT
+
+---
+If this saved you hand‑wiring a TorchForce, mission accomplished. 🚀
+
 Small, practical helpers for using TorchANI models with OpenMM (and ASE when
 needed). The intent is to stay compact: load a model, get energies/forces, wire
 it into an OpenMM `TorchForce`, and run a quick MD experiment (alanine
