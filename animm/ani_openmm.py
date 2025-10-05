@@ -5,9 +5,10 @@ Requires the openmmtorch plugin (``conda install -c conda-forge openmmtorch``).
 The helper builds a TorchScript module wrapping a TorchANI model so that
 OpenMM can obtain energies (and forces via autograd) each integration step.
 """
+
 from __future__ import annotations
 
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import torch
 import torchani
@@ -60,7 +61,9 @@ def _species_tensor(symbols: Sequence[str]) -> torch.Tensor:
     return torch.tensor([idxs], dtype=torch.long)
 
 
-def build_ani_torch_force(topology, model_name: str = "ANI2x", dtype: str = "float32", threads: int | None = None):
+def build_ani_torch_force(
+    topology, model_name: str = "ANI2x", dtype: str = "float32", threads: int | None = None
+):
     """Create a TorchForce for an ANI model for the given OpenMM Topology.
 
     Parameters

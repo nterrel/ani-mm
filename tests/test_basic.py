@@ -1,6 +1,10 @@
-from animm.ani import load_ani_model
+import pytest
+
+try:
+    from animm.ani import load_ani_model
+except Exception:  # pragma: no cover - torchani optional
+    pytest.skip("torchani not available", allow_module_level=True)
 
 
 def test_dummy():
-    # Simple sanity placeholder
-    assert load_ani_model.__name__ == "load_ani_model"
+    assert callable(load_ani_model)

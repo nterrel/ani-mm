@@ -1,8 +1,8 @@
 """Simple OpenMM minimization + MD runner integrating ANI forces (placeholder)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 
@@ -25,13 +25,14 @@ class MDState:
     time: np.ndarray  # (T,)
 
 
-def minimize_and_md(ase_atoms: Atoms, ani_model, n_steps: int = 1000, temperature: float = 300.0, dt_fs: float = 0.5) -> MDState:
+def minimize_and_md(
+    ase_atoms: Atoms, ani_model, n_steps: int = 1000, temperature: float = 300.0, dt_fs: float = 0.5
+) -> MDState:
     """Placeholder function: at this stage just returns initial state replicated.
 
     A future implementation will build an OpenMM System that queries ANI for forces.
     """
-    positions = np.repeat(np.expand_dims(
-        ase_atoms.get_positions(), 0), repeats=2, axis=0)
+    positions = np.repeat(np.expand_dims(ase_atoms.get_positions(), 0), repeats=2, axis=0)
     velocities = np.zeros_like(positions)
     time = np.array([0.0, n_steps * dt_fs * 1e-3])
     return MDState(positions=positions, velocities=velocities, time=time)

@@ -1,6 +1,7 @@
 # ani-mm
 
 Hybrid ANI + OpenMM molecular modelling utilities.
+Current release only optimized for MacOS running on Apple Silicon.
 
 ## Goals
 
@@ -18,11 +19,8 @@ Provide simple utilities to:
 ```bash
 conda create -n ani-mm python=3.10 -y
 conda activate ani-mm
-conda install -c conda-forge openmm=8.0.0 ase rdkit -y
-# Install PyTorch (CPU example; choose CUDA build per https://pytorch.org)
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install torchani
-pip install -e .[dev]
+conda install -c conda-forge openmm=8.0.0 ase rdkit pytorch torchani -y
+pip install -e .[dev,ml]
 ```
 
 For GPU (CUDA 12 example):
@@ -38,7 +36,30 @@ python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install openmm ase torch torchani rdkit-pypi
-pip install -e .[dev]
+pip install -e .[dev,ml]
+### Using bleeding-edge TorchANI (GitHub main)
+
+If you need features or models newer than the packaged release:
+
+```bash
+pip install -e .[dev,ml-git]
+```
+
+Alternatively, pin a specific commit for full reproducibility (replace `SHA`):
+
+```bash
+pip install "torchani @ git+https://github.com/aiqm/torchani.git@SHA"
+```
+
+Or clone as a submodule for local patching:
+
+```bash
+git submodule add https://github.com/aiqm/torchani external/torchani
+pip install -e external/torchani
+```
+
+The repository ships a helper script `scripts/install_latest_torchani.sh` to automate a shallow clone.
+
 ```
 
 Torch / CUDA: Install the appropriate torch build for your hardware following <https://pytorch.org> before (or after) installing `torchani` if you want GPU acceleration.
@@ -73,4 +94,5 @@ Add `--dcd traj.dcd` to write a trajectory.
 - [x] Alanine dipeptide vacuum MD example
 
 ## License
+
 MIT

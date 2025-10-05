@@ -1,7 +1,6 @@
 """Conversion helpers between simple molecular representations and ASE."""
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from ase import Atoms
 from ase.build import molecule

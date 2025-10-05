@@ -6,10 +6,10 @@ Provides a convenience function to build an alanine dipeptide system in vacuum
 If OpenMM is not installed, calling the public function will raise an
 ImportError with a helpful message.
 """
+
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 try:
     import openmm
@@ -58,7 +58,8 @@ def simulate_alanine_dipeptide(
     """
     if openmm is None or app is None or unit is None:  # pragma: no cover
         raise ImportError(
-            "OpenMM is required for simulate_alanine_dipeptide; install openmm first.")
+            "OpenMM is required for simulate_alanine_dipeptide; install openmm first."
+        )
 
     # Build topology & system
     # Build a simple Ala dipeptide (ACE-ALA-NME) from an embedded PDB string.
@@ -140,9 +141,15 @@ END
     reporters = []
     if out_dcd:
         reporters.append(app.DCDReporter(out_dcd, report_interval))
-    reporters.append(app.StateDataReporter(
-        file="-", reportInterval=report_interval, step=True, potentialEnergy=True, temperature=True
-    ))
+    reporters.append(
+        app.StateDataReporter(
+            file="-",
+            reportInterval=report_interval,
+            step=True,
+            potentialEnergy=True,
+            temperature=True,
+        )
+    )
     for r in reporters:
         sim.reporters.append(r)
 
