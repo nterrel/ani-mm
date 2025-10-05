@@ -1,11 +1,15 @@
-"""OpenMM integration helpers for adding an ANI potential via TorchForce.
+"""OpenMM + TorchANI integration.
 
-Requires the openmm-torch plugin (``conda install -c conda-forge openmm-torch``).
-Python import name historically was ``openmmtorch`` (still used upstream); some
-build variants could expose ``openmm_torch``. We attempt both for robustness.
+Builds an OpenMM ``TorchForce`` wrapping a TorchANI model traced to TorchScript
+so energies (and autograd forces) are available every MD step.
 
-The helper builds a TorchScript module wrapping a TorchANI model so that
-OpenMM can obtain energies (and forces via autograd) each integration step.
+Notes
+-----
+* Requires the ``openmm-torch`` plugin.
+* Both historical import names (``openmmtorch`` / ``openmm_torch``) are tried.
+* Traced modules are cached per (MODEL, NATOMS, DTYPE) to avoid repeated tracing.
+* Double precision is preferred; will fall back to float32 automatically if the
+    environment cannot trace the model in float64.
 """
 
 from __future__ import annotations
@@ -59,11 +63,11 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
 
 
 def _species_atomic_numbers(topology) -> torch.Tensor:
-    """Return (1, N) tensor of atomic numbers for the given topology.
+    """Return shape (1, N) tensor of atomic numbers.
 
-    TorchANI models (e.g., ANI2x/ANI2dr) expect atomic numbers, not a local
-    reindexed species mapping. Using atomic numbers avoids element order
-    assumptions and supports any subset the model was trained on.
+    Using true atomic numbers (rather than an internal reindex) mirrors how
+    modern TorchANI models expect species and reduces assumptions about element
+    ordering.
     """
     nums = []
     for atom in topology.atoms():
@@ -83,18 +87,20 @@ def build_ani_torch_force(
     threads: int | None = None,
     cache: bool = True,
 ):
-    """Create a TorchForce for an ANI model for the given OpenMM Topology.
+    """Return a ``TorchForce`` for an ANI model & topology.
 
     Parameters
     ----------
     topology : openmm.app.Topology
-        System topology whose atomic ordering must match the Simulation.
+        Topology whose atom ordering must match the target ``Simulation``.
     model_name : str
-        Name of ANI pretrained model (currently only 'ANI2x').
+        ANI model name (e.g. ``ANI2DR`` or ``ANI2X``).
     dtype : str
-        'float64' (default for numerical fidelity) or 'float32' (faster).
+        Requested tracing precision (``float64`` default; falls back to ``float32``).
     threads : int | None
-        If provided, sets torch.set_num_threads for this module build.
+        Optional override for ``torch.set_num_threads`` during trace.
+    cache : bool
+        If True (default) reuse/store a traced module in the in‑process cache.
     """
     if TorchForce is None:  # pragma: no cover
         raise ImportError(

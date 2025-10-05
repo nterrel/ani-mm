@@ -1,4 +1,8 @@
-"""Conversion helpers between simple molecular representations and ASE."""
+"""Lightweight conversions -> ASE ``Atoms``.
+
+Primary function: ``smiles_to_ase`` using RDKit when present, else a limited
+fallback via ``ase.build.molecule``.
+"""
 
 from __future__ import annotations
 
@@ -23,13 +27,13 @@ def smiles_to_ase(smiles: str, add_h: bool = True, conformer_id: int = 0) -> Ato
         # Fallback: interpret as a known molecule name or formula
         return molecule(smiles)
 
-    mol = Chem.MolFromSmiles(smiles)
+    mol = Chem.MolFromSmiles(smiles)  # type: ignore[attr-defined]
     if mol is None:
         raise ValueError(f"Invalid SMILES: {smiles}")
     if add_h:
-        mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())
-    AllChem.UFFOptimizeMolecule(mol)
+        mol = Chem.AddHs(mol)  # type: ignore[attr-defined]
+    AllChem.EmbedMolecule(mol, AllChem.ETKDG())  # type: ignore[attr-defined]
+    AllChem.UFFOptimizeMolecule(mol)  # type: ignore[attr-defined]
     if conformer_id >= mol.GetNumConformers():
         raise ValueError("Conformer index out of range")
 

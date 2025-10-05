@@ -1,7 +1,13 @@
-"""ANI model loading and energy/force calculation utilities.
+"""ANI model utilities.
 
-Supported model names (case-insensitive):
-    ANI2DR (default), ANI2X, ANI2XPERIODIC (if available in torchani build).
+Provides a thin, version‐stable layer over TorchANI to:
+
+* Load a pretrained ANI model by name (case‑insensitive).
+* Produce an ASE calculator wrapper.
+* Evaluate single‐point energy and forces (Hartree, Hartree/Bohr).
+
+Currently supported model names: ``ANI2DR`` (default), ``ANI2X``. Additional
+models can be registered by extending ``MODEL_LOADERS``.
 """
 
 from __future__ import annotations
@@ -36,6 +42,13 @@ DEFAULT_MODEL = "ANI2DR"
 
 
 def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
+    """Return a raw TorchANI model instance.
+
+    Parameters
+    ----------
+    model_name : str
+        Model identifier (case‑insensitive). Raises ``ValueError`` if unknown.
+    """
     key = model_name.strip().upper()
     if key not in MODEL_LOADERS:
         raise ValueError(
@@ -50,6 +63,7 @@ def load_ani_model(model_name: str = DEFAULT_MODEL):
 
 
 def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
+    """Return list of successfully instantiable model names."""
     available: List[str] = []
     for name in MODEL_LOADERS:
         try:
@@ -62,9 +76,12 @@ def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
 
 
 def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
-    """Compute energy and forces using ANI for an ASE Atoms object.
+    """Compute energy and forces for an ASE ``Atoms`` using a TorchANI ASE model.
 
-    Returns energy (Hartree) and forces (Hartree/Bohr).
+    Returns
+    -------
+    ANIEvaluation
+        Energy (Hartree) and forces (Hartree/Bohr) as float64 tensors.
     """
     # TorchANI ASE wrapper exposes both get_potential_energy(atoms) and get_forces(atoms)
     # returning energy in Hartree and forces in Hartree/Bohr.

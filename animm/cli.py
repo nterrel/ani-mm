@@ -1,10 +1,9 @@
-"""Command line interface for ani-mm.
+"""CLI entry points.
 
-Mitigations:
-    * Set ANIMM_NO_OMP=1 to clamp thread counts to 1 for common math libs.
-    * Use --allow-dup-omp (unsafe) to set KMP_DUPLICATE_LIB_OK=TRUE if you cannot
-        immediately rebuild a clean environment and are hitting the duplicate
-        libomp abort on macOS.
+Environment knobs:
+* ``ANIMM_NO_OMP=1`` – force single threading for common BLAS/OpenMP libs.
+* ``--allow-dup-omp`` – set ``KMP_DUPLICATE_LIB_OK=TRUE`` (escape hatch for
+    macOS duplicate libomp abort; prefer fixing the environment instead).
 """
 
 from __future__ import annotations

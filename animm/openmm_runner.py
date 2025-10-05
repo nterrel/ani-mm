@@ -1,14 +1,14 @@
-"""Generic OpenMM + TorchANI MD runner.
+"""Reusable OpenMM MD driver for ANI potentials.
 
-Provides a reusable function ``run_ani_md`` that:
+Key features:
+* Single ``TorchForce`` (ANI) system construction.
+* Optional energy minimization.
+* Langevin integration with consistent per–step force evaluation.
+* Optional in‑memory trajectory capture and/or DCD output.
+* Final potential energy and temperature estimate (simple 3N DOF assumption).
 
-* Builds an OpenMM ``System`` whose only force is a TorchANI ``TorchForce``.
-* Minimizes (optional) and runs Langevin dynamics with per-step force evaluation.
-* Supports on-the-fly trajectory capture (in-memory) and/or DCD writing.
-* Computes final potential energy and an estimate of the final temperature.
-
-The previous placeholder ``minimize_and_md`` is retained for backward compatibility
-but now calls into the new implementation (and is considered deprecated).
+``minimize_and_md`` is retained as a compatibility shim and will be deprecated
+in a future minor release.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from .ani_openmm import build_ani_torch_force
 
 @dataclass
 class MDState:
-    """Simplified MD trajectory state (legacy placeholder container)."""
+    """Very small legacy container with initial/final snapshot (compat only)."""
 
     positions: np.ndarray  # (T, N, 3)
     velocities: np.ndarray  # (T, N, 3)
@@ -48,7 +48,7 @@ class MDState:
 
 @dataclass
 class MDResult:
-    """Result object returned by ``run_ani_md``.
+    """Structured result returned by ``run_ani_md``.
 
     Attributes
     ----------
@@ -91,10 +91,10 @@ class MDResult:
 # ---------------------------------------------------------------------------
 
 def _ase_to_openmm_topology(ase_atoms: Atoms):
-    """Create a minimal OpenMM Topology and position list (nm) from ASE Atoms.
+    """Create a minimal (non‑bonded) OpenMM topology + positions (nm).
 
-    Bonds are omitted (ANI force does not require bonding terms). Periodic cell
-    is transferred if present and non-zero.
+    Bonds are omitted (ANI does not use them). Periodic vectors are assigned
+    only if any cell axis is non‑zero.
     """
     if app is None or unit is None:
         raise ImportError(
@@ -134,7 +134,7 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
 
 
 class _InMemoryReporter:
-    """Custom reporter that captures positions in-memory at a specified interval."""
+    """Collect positions in memory every ``interval`` steps."""
 
     def __init__(self, interval: int):
         self._interval = int(interval)
@@ -174,7 +174,7 @@ def run_ani_md(
     ani_threads: int | None = None,
     seed: int | None = None,
 ) -> MDResult:
-    """Run Langevin dynamics of an arbitrary ASE Atoms object with ANI forces.
+    """Run Langevin MD for an ASE ``Atoms`` object with an ANI potential.
 
     Parameters
     ----------
@@ -310,10 +310,9 @@ def minimize_and_md(
     temperature: float = 300.0,
     dt_fs: float = 0.5,
 ) -> MDState:  # pragma: no cover - thin wrapper
-    """Deprecated placeholder maintained for backward compatibility.
+    """Compatibility wrapper delegating to :func:`run_ani_md`.
 
-    Delegates to ``run_ani_md`` (without trajectory collection) and returns a
-    very small ``MDState`` snapshot consisting of initial & final positions.
+    Returns only an initial/final two–frame trajectory for legacy callers.
     """
     res = run_ani_md(
         ase_atoms=ase_atoms,

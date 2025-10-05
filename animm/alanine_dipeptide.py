@@ -1,7 +1,8 @@
-"""Alanine dipeptide MD helper using ANI potentials.
+"""Alanine dipeptide reference MD example (vacuum, ANI).
 
-Attempts to use OpenMM + TorchForce if available; otherwise falls back to a
-lightweight ASE + VelocityVerlet integrator using the TorchANI ASE interface.
+Prefers OpenMM + TorchForce (ANI) and falls back to a minimal ASE VelocityVerlet
+loop if the plugin is unavailable. Intended as a quick sanity / demo run, not a
+production workflow.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ def simulate_alanine_dipeptide(
     seed: Optional[int] = None,
     minimize: bool = True,
 ) -> Dict[str, Any]:
-    """Run a short alanine dipeptide MD simulation in vacuum.
+    """Run a short gas‐phase alanine dipeptide simulation.
 
     Parameters
     ----------
@@ -65,7 +66,8 @@ def simulate_alanine_dipeptide(
 
     Returns
     -------
-    dict with keys: steps, final_potential_kjmol, temperature_K, model.
+    Dictionary containing simulation metadata and energies. Per‑step progress
+    is printed to stdout (unless redirected) via a lightweight reporter.
     """
     if openmm is None or app is None or unit is None:  # pragma: no cover
         raise ImportError(

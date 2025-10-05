@@ -1,10 +1,9 @@
-"""ani-mm: Hybrid ANI + OpenMM molecular modelling utilities.
+"""ani-mm: TorchANI + OpenMM utilities.
 
-Public API is experimental and may change until 0.2.0.
-
-This package applies a focused warnings filter to silence the verbose
-`pkg_resources` deprecation notice that PyTorchANI currently emits at import
-time. Once torchani migrates off `pkg_resources`, this filter can be removed.
+Focused scope: fast ANI evaluation and small MD examples with minimal ceremony.
+Warning filters reduce known third‑party noise (deprecated pkg_resources,
+legacy ``simtk.openmm`` bridge message). Adjust or remove these filters locally
+if you need full visibility for debugging.
 """
 
 from __future__ import annotations

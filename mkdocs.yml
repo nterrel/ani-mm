@@ -1,0 +1,56 @@
+site_name: ani-mm
+repo_url: https://github.com/nterrel/ani-mm
+repo_name: nterrel/ani-mm
+site_description: TorchANI + OpenMM utilities
+site_author: Nick Terrel
+copyright: MIT
+
+nav:
+  - Home: index.md
+  - User Guide: user-guide.md
+  - API Reference:
+      - ANI Models: api/ani.md
+      - OpenMM Integration: api/ani_openmm.md
+      - MD Runner: api/openmm_runner.md
+      - Alanine Example: api/alanine_dipeptide.md
+      - Conversion: api/convert.md
+  - Development: development.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.instant
+    - content.code.copy
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: teal
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - footnotes
+  - tables
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: false
+            merge_init_into_class: true
+            heading_level: 2
+            separate_signature: true
+            filters: []
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nterrel/ani-mm

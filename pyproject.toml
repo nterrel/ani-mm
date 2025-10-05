@@ -43,6 +43,12 @@ ml = [
   "torchani @ git+https://github.com/aiqm/torchani.git@main",
 ]
 
+docs = [
+  "mkdocs>=1.6.0",
+  "mkdocs-material>=9.5.0",
+  "mkdocstrings[python]>=0.25.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/nterrel/ani-mm"
 Issues = "https://github.com/nterrel/ani-mm/issues"

@@ -115,10 +115,10 @@ The helper will:
 
 Limitations (0.2.x):
 
-* No periodic systems / cutoffs yet (vacuum / gas-phase only).
-* No restart/checkpoint file support.
-* Alanine helper uses a lightweight custom stdout reporter (potential/Δ/temperature) – richer structured logging pending.
-* `run_ani_md` currently infers actual traced dtype heuristically (reported dtype is the requested one; float64 may internally downgrade if tracing fails and cache key changes).
+* No periodic systems / cutoffs yet (vacuum / gas‑phase only).
+* No restart / checkpoint support.
+* Alanine helper prints directly to stdout (potential / Δ / T). Structured logging pending.
+* Actual traced dtype is attached to the produced ``TorchForce`` (``_animm_traced_dtype``); mixed precision & half precision still future work.
 
 ### Warning Suppression
 
@@ -162,24 +162,68 @@ to manually flush the cache.
 
 ## Tests
 
-Core tests live in `tests/` (TorchANI's own comprehensive suite is vendored under `external/torchani/tests`). Current project-specific tests include:
+Project tests (`tests/`) complement the upstream TorchANI suite (vendored under
+`external/torchani/tests`). Implemented coverage includes:
 
-* Species tensor uses atomic numbers (`test_species_tensor.py`).
+* Model listing & case handling (`test_models.py`).
+* Core energy/force wrapper (`test_ani_energy_forces.py`).
+* SMILES → ASE conversion and error paths (`test_convert.py`).
+* OpenMM runner functionality, cache reuse, dtype fallback (`test_run_ani_md.py`).
+* Alanine helper smoke test (`test_alanine_helper.py`).
+* Traced module dtype attribute (`test_traced_dtype.py`).
+* Species tensor atomic numbers (`test_species_tensor.py`).
+* CLI JSON/text modes (`test_cli.py`).
 
-Planned near-term additions:
-
-* `test_run_ani_md_basic`: short 10–20 step MD with in-memory trajectory collection verifying frame count and energy units.
-* `test_run_ani_md_minimize_effect`: ensure minimization reduces (or does not increase) potential energy vs. unminimized first step for a small structure (tolerant assertion).
-* `test_tracing_dtype_fallback`: simulate (by forcing an unsupported dtype) that float64 fallback to float32 traces without raising.
-* `test_invalid_model_name`: invalid ANI model raises a `ValueError` listing supported models.
-* `test_cache_reuse`: building the same TorchForce twice reuses traced module (no duplicate trace) – can be approximated by inspecting cache size.
-
-Run tests:
+Run the suite:
 
 ```bash
 pytest -q
 ```
 
+Generate a coverage report:
+
+```bash
+pytest --cov=animm --cov-report=term-missing
+```
+
 ## License
 
 MIT
+
+## Contributing
+
+Contributions are welcome. Please keep changes small and focused; open an issue first for larger feature ideas.
+
+Guidelines:
+
+1. Fork / branch: create a feature branch off `main`.
+2. Tests: add or update tests for any user‑visible behavior change (see `tests/`).
+3. Style: run linters/formatters (`ruff`, `black`, `isort`) before submitting. (The dev extra installs them.)
+4. Commit messages: concise, present tense (e.g. "add dtype attribute to TorchForce").
+5. Pull request: include a short rationale and any performance / regression notes.
+
+Development setup:
+
+```bash
+conda env create -f environment.yml  # or your own env
+conda activate ani-mm
+pip install -e .[dev]
+```
+
+Run linters & tests:
+
+```bash
+ruff check .
+black --check .
+isort --check-only .
+pytest -q
+```
+
+Docs (MkDocs) preview locally:
+
+```bash
+pip install -e .[docs]
+mkdocs serve
+```
+
+Please do not commit rendered documentation (`site/`); CI can build it.
