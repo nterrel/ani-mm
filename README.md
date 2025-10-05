@@ -1,31 +1,47 @@
+the same dependency stack. Windows is untested.
 # ani-mm
 
-TorchANI + OpenMM molecular modeling utilities.
-Current 0.2.x line targets macOS (Apple Silicon) primarily; Linux should work with
-the same dependency stack. Windows is untested.
+Small, practical helpers for using TorchANI models with OpenMM (and ASE when
+needed). The intent is to stay compact: load a model, get energies/forces, wire
+it into an OpenMM `TorchForce`, and run a quick MD experiment (alanine
+dipeptide, your own molecule, etc.) without digging through a pile of boilerplate.
 
-## Goals
+The 0.2.x series has mainly been exercised on macOS (Apple Silicon) and Linux.
+Windows hasn’t been tried yet.
 
-Provide small, composable helpers to:
+## What this project actually does
 
-1. Convert a SMILES (via RDKit) or simple name to an ASE `Atoms` object.
-2. Load a TorchANI pretrained model (currently ANI2DR, ANI2X) with a stable, case-insensitive API.
-3. Evaluate ANI energies & forces (ASE interface) in double precision by default.
-4. Construct an OpenMM `TorchForce` wrapping an ANI model (via `openmm-torch`).
-5. Run a minimal alanine dipeptide vacuum MD example (OpenMM when TorchForce available, else ASE fallback).
-6. Generic reusable `run_ani_md` function for arbitrary ASE `Atoms` with optional in-memory trajectory capture and DCD output.
+In plain language:
 
-Planned (not implemented yet):
+- Turn a SMILES string into an ASE `Atoms` (RDKit when available, a tiny
+	fallback otherwise).
+- Load a pretrained TorchANI model by name (currently `ANI2DR`, `ANI2X`).
+- Ask for a single‑point energy and forces (double precision first; drop to
+	float32 only if tracing forces us to).
+- Build a single OpenMM `TorchForce` around that model so every MD step gets
+	neural network forces.
+- Provide a “just run it” alanine dipeptide vacuum simulation (OpenMM first,
+	ASE if the plugin isn’t there).
+- Offer a generic `run_ani_md` function with optional in‑memory coordinates or
+	a DCD on disk.
+- (New) Optional lightweight live viewer window (ASE GUI or Matplotlib) if you
+	want to watch atoms drift while it runs.
 
-* Periodic boundary & cutoff-aware variants (when suitable TorchANI models / parameters are available).
-* Mixed precision / performance tuning switches (explicit autocast, optional half precision on supported hardware).
-* Richer reporter composition (JSON/CSV loggers, force/temperature statistics, checkpointing).
+## Things not done yet (but on the radar)
 
-## Install (development)
+- Periodic boundary / cutoff aware variants (waiting on appropriate model + a
+	clean interface).
+- Mixed precision exploration (make it a toggle instead of secret fallback).
+- A richer pile of reporters (CSV / JSON logs, progress bars, checkpointing).
+- Restart support.
+- Additional small examples beyond alanine.
 
-TorchANI is vendored as a git submodule. The recommended (minimal) workflow installs everything—TorchANI included—via the Conda environment file and then installs this package once.
+## Install (development path)
 
-### Quick Start (recommended)
+TorchANI is vendored as a git submodule. The simplest route is “clone with
+submodules, create environment, editable install.” That’s it.
+
+### Quick start
 
 ```bash
 git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
@@ -35,11 +51,11 @@ conda activate ani-mm
 pip install -e .
 ```
 
-That’s it. The `environment.yml` already performs an editable install of the submodule (`external/torchani`), so the final `pip install -e .` only installs `ani-mm` itself.
+`environment.yml` already does an editable install of the TorchANI submodule,
+so the last line only installs this project. Apple Silicon users get Metal
+acceleration “for free” through conda‑forge’s PyTorch builds.
 
-Apple Silicon: conda-forge PyTorch includes Metal acceleration automatically.
-
-### Manual / Custom Install (if you don’t want to use environment.yml)
+### Manual / custom install (if you’d rather not use the provided env)
 
 Conda variant:
 
@@ -53,7 +69,7 @@ pip install -e external/torchani
 pip install -e .
 ```
 
-Pure pip variant (needs a working compiler & wheels availability):
+Pure pip variant (needs working wheels / compiler):
 
 ```bash
 git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
@@ -66,7 +82,7 @@ pip install -e external/torchani
 pip install -e .
 ```
 
-### Updating TorchANI Submodule
+### Updating the TorchANI submodule
 
 Pull the latest TorchANI main:
 
@@ -75,7 +91,7 @@ git submodule update --remote external/torchani
 pip install -e external/torchani
 ```
 
-Pin a specific TorchANI commit:
+Pin a specific TorchANI commit if you need to reproduce results:
 
 ```bash
 cd external/torchani
@@ -84,9 +100,10 @@ cd ../..
 pip install -e external/torchani
 ```
 
-Torch / CUDA: Install the appropriate torch build for your hardware following <https://pytorch.org>. Re-run the editable TorchANI install afterward if you replace PyTorch.
+If you later switch PyTorch builds (e.g. CUDA vs CPU) just reinstall the
+vendored TorchANI editable again afterwards.
 
-## Quick Example (Energy & Forces)
+## Quick energy / forces example
 
 ```python
 from animm.ani import load_ani_model
@@ -106,21 +123,21 @@ print("Forces shape:", forces.shape)
 ani-mm ala2-md --steps 1000 --t 300 --dt 2.0 --platform CPU
 ```
 
-Add `--dcd traj.dcd` to write a DCD trajectory (only when using OpenMM TorchForce engine).
+Add `--dcd traj.dcd` to also save a DCD (OpenMM / TorchForce path only).
 
-The helper will:
+Behind the scenes it (1) builds an OpenMM `System` with a single neural network
+`TorchForce` (preferring a float64 trace, retrying in float32 only if truly
+required), or (2) quietly drops back to a tiny ASE velocity Verlet loop if the
+plugin is missing.
 
-* Try to build an OpenMM `System` with a single `TorchForce` (ANI model traced to TorchScript in double precision; falls back to float32 if tracing fails).
-* Fall back to an ASE velocity Verlet integrator if `openmm-torch` is not importable.
+Current limitations:
 
-Limitations (0.2.x):
+- Vacuum only (no periodic boundary conditions yet).
+- No restart / checkpoint.
+- Alanine example writes a CSV‑ish line per report straight to stdout for now.
+- Mixed precision is a future knob; the trace dtype sits on the force object as `_animm_traced_dtype` today.
 
-* No periodic systems / cutoffs yet (vacuum / gas‑phase only).
-* No restart / checkpoint support.
-* Alanine helper prints directly to stdout (potential / Δ / T). Structured logging pending.
-* Actual traced dtype is attached to the produced ``TorchForce`` (``_animm_traced_dtype``); mixed precision & half precision still future work.
-
-### Warning Suppression
+### About the warning noise you *don’t* see
 
 The package suppresses a few known noisy warnings (via `warnings.filterwarnings` and selective stderr redirection during critical imports):
 
@@ -128,15 +145,15 @@ The package suppresses a few known noisy warnings (via `warnings.filterwarnings`
 * Experimental TorchANI model (ANI-2xr) user warning.
 * `pkg_resources` deprecation warning triggered during TorchANI import.
 
-Re-enable them with: `PYTHONWARNINGS=default` or by editing the filters in `animm/__init__.py` and `animm/cli.py`.
+If you want everything back, run with `PYTHONWARNINGS=default` or delete those
+filters locally.
 
-### Precision
+### Precision & caching
 
-Tracing prefers float64 (double) for improved force fidelity. If TorchScript tracing fails due to a dtype mismatch in the current environment, it logs a warning and retries in float32.
-
-### Caching
-
-Traced TorchScript modules for a given (MODEL, NATOMS, DTYPE) triplet are cached in-process to avoid repeated tracing overhead. Use:
+Tracing starts in float64 for stability; if TorchScript complains about dtype
+mismatches we fall back to float32, logging the reason. The traced module is
+cached per `(MODEL, NATOMS, DTYPE)` so repeated runs don’t re‑trace every time.
+Clear it manually if you like:
 
 ```python
 from animm.ani_openmm import clear_traced_cache
@@ -145,7 +162,7 @@ clear_traced_cache()
 
 to manually flush the cache.
 
-## Roadmap (high-level)
+## Roadmap snapshot
 
 * [x] Basic ANI energy/force evaluation wrapper
 * [x] ASE <-> OpenMM conversion helpers
@@ -162,17 +179,11 @@ to manually flush the cache.
 
 ## Tests
 
-Project tests (`tests/`) complement the upstream TorchANI suite (vendored under
-`external/torchani/tests`). Implemented coverage includes:
-
-* Model listing & case handling (`test_models.py`).
-* Core energy/force wrapper (`test_ani_energy_forces.py`).
-* SMILES → ASE conversion and error paths (`test_convert.py`).
-* OpenMM runner functionality, cache reuse, dtype fallback (`test_run_ani_md.py`).
-* Alanine helper smoke test (`test_alanine_helper.py`).
-* Traced module dtype attribute (`test_traced_dtype.py`).
-* Species tensor atomic numbers (`test_species_tensor.py`).
-* CLI JSON/text modes (`test_cli.py`).
+The test suite here supplements TorchANI’s upstream tests (vendored in
+`external/torchani/tests`). Local coverage touches models, energy/forces,
+conversion, the OpenMM runner (including cache + dtype fallback), alanine
+helper, dtype attribute, species tensor mapping, CLI modes, and the optional
+live viewer.
 
 Run the suite:
 
@@ -180,7 +191,7 @@ Run the suite:
 pytest -q
 ```
 
-Generate a coverage report:
+Coverage report:
 
 ```bash
 pytest --cov=animm --cov-report=term-missing
@@ -192,17 +203,10 @@ MIT
 
 ## Contributing
 
-Contributions are welcome. Please keep changes small and focused; open an issue first for larger feature ideas.
+Short version: open an issue or PR, keep the diff focused, include/update
+tests if behavior changes, and run the linters before pushing.
 
-Guidelines:
-
-1. Fork / branch: create a feature branch off `main`.
-2. Tests: add or update tests for any user‑visible behavior change (see `tests/`).
-3. Style: run linters/formatters (`ruff`, `black`, `isort`) before submitting. (The dev extra installs them.)
-4. Commit messages: concise, present tense (e.g. "add dtype attribute to TorchForce").
-5. Pull request: include a short rationale and any performance / regression notes.
-
-Development setup:
+Setup (if you haven’t already):
 
 ```bash
 conda env create -f environment.yml  # or your own env
@@ -210,7 +214,7 @@ conda activate ani-mm
 pip install -e .[dev]
 ```
 
-Run linters & tests:
+Linters & tests:
 
 ```bash
 ruff check .
@@ -219,11 +223,12 @@ isort --check-only .
 pytest -q
 ```
 
-Docs (MkDocs) preview locally:
+Docs (MkDocs) locally:
 
 ```bash
 pip install -e .[docs]
 mkdocs serve
 ```
 
-Please do not commit rendered documentation (`site/`); CI can build it.
+Please don’t commit the built `site/` folder; let CI or a release action build
+public docs.

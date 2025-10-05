@@ -17,12 +17,13 @@ tool.
 
 from __future__ import annotations
 
-from typing import Optional, Tuple, Any
+from typing import Any, Optional, Tuple
 
 import numpy as np
 
 try:  # Lazy / optional dependency (matplotlib)
     import matplotlib
+
     # Try to use an interactive backend; if already set and non-interactive, leave it.
     if matplotlib.get_backend().lower() in {"agg", "pdf", "svg"}:
         try:  # pragma: no cover - backend selection is environment dependent
@@ -30,6 +31,7 @@ try:  # Lazy / optional dependency (matplotlib)
         except Exception:  # pragma: no cover
             pass
     import matplotlib.pyplot as plt
+
     _HAVE_MPL = True
 except Exception:  # pragma: no cover - headless or matplotlib missing
     _HAVE_MPL = False
@@ -38,6 +40,7 @@ except Exception:  # pragma: no cover - headless or matplotlib missing
 try:  # ASE GUI optional dependency
     from ase import Atoms as _ASEAtoms  # type: ignore
     from ase.gui.gui import GUI as _ASEGUI  # type: ignore
+
     _HAVE_ASE_GUI = True
 except Exception:  # pragma: no cover - missing ASE or GUI toolkit
     _HAVE_ASE_GUI = False
@@ -112,6 +115,8 @@ class LiveTrajectoryViewer:
             self.fig.canvas.draw_idle()
         except Exception:  # pragma: no cover
             pass
+
+
 class _ASEAtomsViewer:
     """Wrap ASE GUI viewer for live updating.
 
@@ -171,11 +176,18 @@ class _LiveViewerReporter:
             return
         import openmm.unit as unit  # local import to avoid hard dependency earlier
 
-        pos_nm = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)  # type: ignore[attr-defined]
+        pos_nm = state.getPositions(asNumpy=True).value_in_unit(
+            unit.nanometer
+        )  # type: ignore[attr-defined]
         self.viewer.update(np.asarray(pos_nm) * 10.0, self._step)  # nm -> Å
 
 
-def build_live_viewer_reporter(symbols, interval: int = 100, backend: str = "auto", initial_positions_ang: Optional[np.ndarray] = None) -> Tuple[object, object]:
+def build_live_viewer_reporter(
+    symbols,
+    interval: int = 100,
+    backend: str = "auto",
+    initial_positions_ang: Optional[np.ndarray] = None,
+) -> Tuple[object, object]:
     """Factory returning (viewer, reporter) for the selected backend.
 
     Parameters
@@ -203,6 +215,7 @@ def build_live_viewer_reporter(symbols, interval: int = 100, backend: str = "aut
     elif chosen == "mpl" and _HAVE_MPL:
         viewer = LiveTrajectoryViewer(symbols)
     else:  # disabled no-op
+
         class _DisabledViewer:
             enabled = False
 
@@ -214,6 +227,7 @@ def build_live_viewer_reporter(symbols, interval: int = 100, backend: str = "aut
 
             def status(self):
                 return "disabled"
+
         viewer = _DisabledViewer()
     reporter = _LiveViewerReporter(viewer, interval=interval)
     return viewer, reporter

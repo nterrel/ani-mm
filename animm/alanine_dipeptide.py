@@ -183,6 +183,7 @@ END
                 symbols = [a.element.symbol for a in pdb.topology.atoms()]
                 initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0) for pos in pdb.positions]
                 import numpy as _np
+
                 from .gui import build_live_viewer_reporter  # type: ignore
 
                 live_viewer, live_reporter = build_live_viewer_reporter(
@@ -239,7 +240,9 @@ END
         state = sim.context.getState(getEnergy=True)
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
         try:  # finalize viewer
-            if live_view and live_viewer is not None and getattr(live_viewer, "enabled", False):  # pragma: no cover - GUI
+            if (
+                live_view and live_viewer is not None and getattr(live_viewer, "enabled", False)
+            ):  # pragma: no cover - GUI
                 live_viewer.finalize()  # type: ignore
         except Exception:  # pragma: no cover
             pass

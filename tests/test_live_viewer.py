@@ -2,6 +2,7 @@ import numpy as np
 
 from animm.gui import build_live_viewer_reporter
 
+
 def test_build_live_viewer_reporter_disabled_headless():
     # Provide empty positions so ASE backend requirement can be skipped
     symbols = ["H", "H"]
@@ -13,4 +14,4 @@ def test_build_live_viewer_reporter_disabled_headless():
 
     # Update with dummy positions if viewer enabled (smoke path)
     if getattr(viewer, "enabled", False):
-        viewer.update(np.zeros((2,3)), step=0)  # type: ignore
+        viewer.update(np.zeros((2, 3)), step=0)  # type: ignore
