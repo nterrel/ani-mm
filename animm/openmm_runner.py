@@ -173,6 +173,8 @@ def run_ani_md(
     dtype: str = "float64",
     ani_threads: int | None = None,
     seed: int | None = None,
+    live_view: bool = False,
+    live_interval: int | None = None,
 ) -> MDResult:
     """Run Langevin MD for an ASE ``Atoms`` object with an ANI potential.
 
@@ -206,6 +208,13 @@ def run_ani_md(
         Override torch thread count for force evaluation.
     seed : int | None
         Random seed for integrator RNG.
+    live_view : bool
+        If True, open a lightweight desktop scatter plot window that updates
+        every ``live_interval`` steps (matplotlib required). Falls back
+        gracefully if matplotlib or a GUI backend is unavailable.
+    live_interval : int | None
+        Interval for live view updates. Defaults to ``report_interval`` if
+        not provided.
     """
     if openmm is None or app is None or unit is None:
         raise ImportError("OpenMM (and openmm-torch) required for run_ani_md")
@@ -252,6 +261,17 @@ def run_ani_md(
         sim.reporters.append(inmem_reporter)
     if dcd_path:
         sim.reporters.append(app.DCDReporter(dcd_path, report_interval))
+    live_viewer = None
+    if live_view:
+        try:  # Lazy import to avoid hard dependency
+            from .gui import build_live_viewer_reporter  # type: ignore
+
+            lv_interval = int(live_interval) if live_interval else int(report_interval)
+            symbols = ase_atoms.get_chemical_symbols()
+            live_viewer, live_reporter = build_live_viewer_reporter(symbols, interval=lv_interval)
+            sim.reporters.append(live_reporter)
+        except Exception:  # pragma: no cover - GUI optional
+            live_viewer = None
     # Always add a lightweight state reporter to STDOUT disabled by default? (Skipped for library)
 
     # Ensure we capture initial frame if collecting
@@ -289,6 +309,13 @@ def run_ani_md(
     # Determine traced dtype actually used (inspect internal cache key if needed)
     # heuristic; build_ani_torch_force updates cache key but we did not expose it
     actual_dtype = getattr(ani_force, "_animm_traced_dtype", dtype)
+
+    # Finalize live viewer (leave window open)
+    try:  # pragma: no cover - GUI specific
+        if live_viewer is not None and getattr(live_viewer, "enabled", False):
+            live_viewer.finalize()
+    except Exception:
+        pass
 
     return MDResult(
         final_potential_kjmol=float(potential),
