@@ -9,7 +9,7 @@ ImportError with a helpful message.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 try:
     import openmm
@@ -29,7 +29,6 @@ def simulate_alanine_dipeptide(
     report_interval: int = 50,
     out_dcd: Optional[str] = None,
     platform_name: Optional[str] = None,
-    force_mode: str = "amber",  # 'amber' | 'ani' | 'hybrid'
     ani_model: str = "ANI2DR",
     ani_threads: Optional[int] = None,
     seed: Optional[int] = None,
@@ -53,6 +52,10 @@ def simulate_alanine_dipeptide(
         Optional path to write a DCD trajectory.
     platform_name: str | None
         Force a specific OpenMM platform (e.g. 'CUDA', 'CPU').
+    ani_model: str
+        Name of the TorchANI model to use (default ANI2DR).
+    ani_threads: int | None
+        Override torch thread count for the ANI TorchForce (optional).
     seed: int | None
         Random seed for the Langevin integrator RNG.
     minimize: bool
@@ -60,7 +63,7 @@ def simulate_alanine_dipeptide(
 
     Returns
     -------
-    dict with keys: steps, final_potential_kjmol, temperature_K.
+    dict with keys: steps, final_potential_kjmol, temperature_K, model.
     """
     if openmm is None or app is None or unit is None:  # pragma: no cover
         raise ImportError(
@@ -111,91 +114,22 @@ END
 """
         pdb = app.PDBFile(StringIO(fallback_pdb))
 
-    force_mode_lc = force_mode.lower()
-    if force_mode_lc not in {"amber", "ani", "hybrid"}:
-        raise ValueError("force_mode must be one of: amber, ani, hybrid")
-
-    system = None  # will be set below
-    if force_mode_lc in {"amber", "hybrid"}:
-        # Some Amber14 XML collections separate protein parameters; ACE/NME caps
-        # are reliably present in "amber14/protein.ff14SB.xml". Fallback to the
-        # broader pair previously used if the first attempt fails for any reason.
-        ff_file_sets = [
-            ["amber14/protein.ff14SB.xml"],
-            ["amber14-all.xml", "amber14/tip3pfb.xml"],
-        ]
-        last_exc: Exception | None = None
-        forcefield = None
-        for files in ff_file_sets:
-            try:
-                forcefield = app.ForceField(*files)
-                system = forcefield.createSystem(
-                    pdb.topology,
-                    nonbondedMethod=app.NoCutoff,
-                    constraints=app.HBonds,
-                )
-                break
-            except Exception as exc:  # pragma: no cover - depends on local ff install
-                last_exc = exc
-                continue
-        if system is None:  # pragma: no cover - only if all attempts fail
-            # Attempt graceful fallback to ANI-only simulation if user requested plain Amber.
-            if force_mode_lc == "amber":
-                import warnings
-
-                warnings.warn(
-                    "Amber14 parameterization failed (missing ACE/NME templates?). "
-                    "Falling back to ANI-only simulation. Pass --force-mode ani to avoid this fallback message.",
-                    RuntimeWarning,
-                )
-                # Build minimal system with particle masses
-                system = openmm.System()
-                for atom in pdb.topology.atoms():
-                    system.addParticle(atom.element.mass)
-                # Attach ANI TorchForce
-                try:
-                    from .ani_openmm import build_ani_torch_force  # local helper
-
-                    ani_torch_force = build_ani_torch_force(
-                        topology=pdb.topology,
-                        model_name=ani_model,
-                        threads=ani_threads,
-                    )
-                    system.addForce(ani_torch_force)
-                    force_mode_lc = "ani"
-                except Exception as ani_fallback_exc:  # pragma: no cover - missing deps
-                    raise RuntimeError(
-                        "Failed Amber parameterization AND ANI fallback failed. "
-                        "Install torchani/openmmtorch or use a simpler topology. Original error: "
-                        f"{last_exc}; ANI fallback error: {ani_fallback_exc}"
-                    ) from last_exc
-            else:
-                raise RuntimeError(
-                    "Failed to parameterize alanine dipeptide with Amber14 force field. "
-                    "Tried file sets: protein.ff14SB.xml then amber14-all.xml/tip3pfb.xml. "
-                    "Consider using --force-mode ani to bypass Amber or ensure ACE/NME templates are available. "
-                    f"Last error: {last_exc}"
-                ) from last_exc
-    else:
-        system = openmm.System()
-        # Add particles with masses from topology
-        for atom in pdb.topology.atoms():
-            system.addParticle(atom.element.mass)
-
-    if force_mode_lc in {"ani", "hybrid"}:
-        try:
-            from .ani_openmm import build_ani_torch_force  # local helper
-        except ImportError as exc:  # pragma: no cover - plugin missing
-            raise ImportError(
-                "ANI force requested but openmmtorch / torchani dependencies not satisfied."
-            ) from exc
-        ani_torch_force = build_ani_torch_force(
-            topology=pdb.topology,
-            model_name=ani_model,
-            threads=ani_threads,
-        )
-        assert system is not None  # for mypy
-        system.addForce(ani_torch_force)
+    # Always build an empty system and apply ANI as the sole potential.
+    system = openmm.System()
+    for atom in pdb.topology.atoms():
+        system.addParticle(atom.element.mass)
+    try:
+        from .ani_openmm import build_ani_torch_force  # local helper
+    except ImportError as exc:  # pragma: no cover - plugin missing
+        raise ImportError(
+            "TorchANI/OpenMM Torch plugin not available; install extras 'ml' or provide openmmtorch."
+        ) from exc
+    ani_torch_force = build_ani_torch_force(
+        topology=pdb.topology,
+        model_name=ani_model,
+        threads=ani_threads,
+    )
+    system.addForce(ani_torch_force)
 
     # Integrator: convert timestep fs -> ps
     dt_ps = timestep_fs * 1e-3
@@ -209,7 +143,6 @@ END
     if platform_name:
         platform = openmm.Platform.getPlatformByName(platform_name)
 
-    assert system is not None
     sim = app.Simulation(pdb.topology, system, integrator, platform)
     sim.context.setPositions(pdb.positions)
 
@@ -246,7 +179,7 @@ END
         "final_potential_kjmol": final_pot,
         "temperature_K": temperature,
         "dcd_path": out_dcd,
-        "force_mode": force_mode_lc,
+        "model": ani_model,
         "seed": seed,
         "minimized": minimize,
     }

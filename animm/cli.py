@@ -70,12 +70,6 @@ def main(argv: list[str] | None = None):
     p_ala2.add_argument("--platform", default=None,
                         help="OpenMM platform name (e.g. CUDA, CPU)")
     p_ala2.add_argument(
-        "--force-mode",
-        default="amber",
-        choices=["amber", "ani", "hybrid"],
-        help="Which forces to use: classical Amber, ANI only, or hybrid (Amber + ANI additive)",
-    )
-    p_ala2.add_argument(
         "--ani-model",
         default="ANI2DR",
         help="ANI model name (default ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
@@ -149,7 +143,6 @@ def main(argv: list[str] | None = None):
             report_interval=args.report,
             out_dcd=args.dcd,
             platform_name=args.platform,
-            force_mode=args.force_mode,
             ani_model=args.ani_model,
             ani_threads=args.ani_threads,
             seed=args.seed,
@@ -159,7 +152,7 @@ def main(argv: list[str] | None = None):
             print(json.dumps(sim_info))
         else:
             print(
-                f"Finished steps={sim_info['steps']} mode={sim_info['force_mode']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol"
+                f"Finished steps={sim_info['steps']} model={sim_info['model']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol"
             )
         return 0
 
