@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import Sequence
 
 import torch
-import torchani
 
 try:  # optional plugin
     from openmmtorch import TorchForce  # type: ignore
