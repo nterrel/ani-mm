@@ -1,14 +1,20 @@
 name: ani-mm
 channels:
   - conda-forge
-  - pytorch
 dependencies:
   - python=3.10
   - openmm=8.0.0
   - ase
   - rdkit
+  - pytorch  # conda-forge build (CPU or Metal acceleration on Apple Silicon)
+  - torchani
+  - openmmtorch  # for TorchForce (ANI in OpenMM)
   - pip
   - pip:
-      - torch  # choose CUDA-specific wheel manually if needed
-      - torchani
       - -e .[dev]
+
+# Notes:
+# 1. Keeping everything (OpenMM, PyTorch, TorchANI) from conda-forge reduces risk of multiple libomp runtimes.
+# 2. For CUDA-enabled Linux systems, you can instead install the official CUDA PyTorch wheels and then add torchani via pip;
+#    but ensure only one OpenMP runtime by avoiding mixing system Homebrew llvm-openmp with conda-forge packages.
+# 3. If you previously installed torch via pip in this env, remove the env entirely before recreating to clear old libomp copies.

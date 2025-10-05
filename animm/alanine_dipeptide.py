@@ -22,13 +22,16 @@ except ImportError:  # pragma: no cover - optional dependency placeholder
 
 
 def simulate_alanine_dipeptide(
-    n_steps: int = 2000,
-    temperature: float = 300.0,
+    n_steps: int = 1000,
+    temperature: float = 298.15,
     friction_per_ps: float = 1.0,
     timestep_fs: float = 2.0,
-    report_interval: int = 200,
+    report_interval: int = 50,
     out_dcd: Optional[str] = None,
     platform_name: Optional[str] = None,
+    force_mode: str = "amber",  # 'amber' | 'ani' | 'hybrid'
+    ani_model: str = "ANI2x",
+    ani_threads: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Run a short alanine dipeptide MD simulation in vacuum.
 
@@ -58,10 +61,7 @@ def simulate_alanine_dipeptide(
             "OpenMM is required for simulate_alanine_dipeptide; install openmm first.")
 
     # Build topology & system
-    pdb = app.PDBFile(app.internal.pdbx.PdbxDict.getPdbString(
-        app.AmberPrmtopFile))  # placeholder? unrealistic
-    # Simpler: use built-in AlanineDipeptide in OpenMM examples (not directly exposed). We'll construct from a sequence via Modeller.
-    # Construct Ala dipeptide (ACE-ALA-NME). We can build using PeptideModeller style; easiest is to load from a PDB string.
+    # Build a simple Ala dipeptide (ACE-ALA-NME) from an embedded PDB string.
     ala2_pdb_str = """
 ATOM      1  N   ACE A   1      -1.207   1.207   0.000  1.00  0.00           N
 ATOM      2  CH3 ACE A   1       0.000   0.000   0.000  1.00  0.00           C
@@ -91,17 +91,43 @@ END
 
     pdb = app.PDBFile(StringIO(ala2_pdb_str))
 
-    forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
-    system = forcefield.createSystem(
-        pdb.topology,
-        nonbondedMethod=app.NoCutoff,
-        constraints=app.HBonds,
-    )
+    force_mode_lc = force_mode.lower()
+    if force_mode_lc not in {"amber", "ani", "hybrid"}:
+        raise ValueError("force_mode must be one of: amber, ani, hybrid")
 
+    if force_mode_lc in {"amber", "hybrid"}:
+        forcefield = app.ForceField("amber14-all.xml", "amber14/tip3pfb.xml")
+        system = forcefield.createSystem(
+            pdb.topology,
+            nonbondedMethod=app.NoCutoff,
+            constraints=app.HBonds,
+        )
+    else:
+        system = openmm.System()
+        # Add particles with masses from topology
+        for atom in pdb.topology.atoms():
+            system.addParticle(atom.element.mass)
+
+    if force_mode_lc in {"ani", "hybrid"}:
+        try:
+            from .ani_openmm import build_ani_torch_force  # local helper
+        except ImportError as exc:  # pragma: no cover - plugin missing
+            raise ImportError(
+                "ANI force requested but openmmtorch / torchani dependencies not satisfied."
+            ) from exc
+        torch_force = build_ani_torch_force(
+            topology=pdb.topology,
+            model_name=ani_model,
+            threads=ani_threads,
+        )
+        system.addForce(torch_force)
+
+    # Integrator: convert timestep fs -> ps
+    dt_ps = timestep_fs * 1e-3
     integrator = openmm.LangevinIntegrator(
         temperature * unit.kelvin,
         friction_per_ps / unit.picosecond,
-        timestep_fs * unit.femtoseconds,
+        dt_ps * unit.picoseconds,
     )
 
     platform = None
@@ -130,4 +156,5 @@ END
         "final_potential_kjmol": final_pot,
         "temperature_K": temperature,
         "dcd_path": out_dcd,
+        "force_mode": force_mode_lc,
     }
