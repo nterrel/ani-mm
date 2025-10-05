@@ -62,7 +62,7 @@ def _species_tensor(symbols: Sequence[str]) -> torch.Tensor:
 
 
 def build_ani_torch_force(
-    topology, model_name: str = "ANI2x", dtype: str = "float32", threads: int | None = None
+    topology, model_name: str = "ANI2DR", dtype: str = "float32", threads: int | None = None
 ):
     """Create a TorchForce for an ANI model for the given OpenMM Topology.
 
@@ -82,13 +82,12 @@ def build_ani_torch_force(
             "openmmtorch not available. Install with: conda install -c conda-forge openmmtorch"
         ) from _torchforce_import_error
 
-    if model_name.upper() != "ANI2X":  # pragma: no cover - single model for now
-        raise ValueError("Only ANI2x supported at present")
+    from .ani import get_raw_ani_model
 
     if threads is not None:  # pragma: no cover - environment dependent
         torch.set_num_threads(int(threads))
 
-    ani_model = torchani.models.ANI2x()
+    ani_model = get_raw_ani_model(model_name)
     if dtype == "float64":  # pragma: no cover
         ani_model = ani_model.double()
     else:

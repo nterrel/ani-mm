@@ -38,7 +38,11 @@ def main(argv: list[str] | None = None):
 
     p_eval = sub.add_parser("eval", help="Evaluate ANI energy for a SMILES")
     p_eval.add_argument("smiles", help="SMILES string")
-    p_eval.add_argument("--model", default="ANI2x", help="ANI model name (default: ANI2x)")
+    p_eval.add_argument(
+        "--model",
+        default="ANI2DR",
+        help="ANI model name (default: ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
+    )
 
     p_ala2 = sub.add_parser("ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
     p_ala2.add_argument("--steps", type=int, default=2000, help="Number of MD steps (default 2000)")
@@ -53,7 +57,11 @@ def main(argv: list[str] | None = None):
         choices=["amber", "ani", "hybrid"],
         help="Which forces to use: classical Amber, ANI only, or hybrid (Amber + ANI additive)",
     )
-    p_ala2.add_argument("--ani-model", default="ANI2x", help="ANI model name (currently ANI2x)")
+    p_ala2.add_argument(
+        "--ani-model",
+        default="ANI2DR",
+        help="ANI model name (default ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
+    )
     p_ala2.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
