@@ -1,6 +1,8 @@
 """OpenMM integration helpers for adding an ANI potential via TorchForce.
 
 Requires the openmm-torch plugin (``conda install -c conda-forge openmm-torch``).
+Python import name historically was ``openmmtorch`` (still used upstream); some
+build variants could expose ``openmm_torch``. We attempt both for robustness.
 
 The helper builds a TorchScript module wrapping a TorchANI model so that
 OpenMM can obtain energies (and forces via autograd) each integration step.
@@ -8,17 +10,20 @@ OpenMM can obtain energies (and forces via autograd) each integration step.
 
 from __future__ import annotations
 
-from typing import Dict, Sequence, Tuple, Any
+from typing import Any, Dict, Sequence, Tuple
 
 import torch
 
-try:  # optional plugin
-    from openmm_torch import TorchForce  # type: ignore
-except Exception as exc:  # pragma: no cover - module load guard
-    TorchForce = None  # type: ignore
-    _torchforce_import_error = exc
-else:
-    _torchforce_import_error = None
+_torchforce_import_error = None
+TorchForce = None  # type: ignore
+for _mod_name in ("openmmtorch", "openmm_torch"):
+    if TorchForce is not None:
+        break
+    try:  # pragma: no cover - import guard
+        TorchForce = __import__(_mod_name, fromlist=["TorchForce"]).TorchForce  # type: ignore[attr-defined]
+    except Exception as exc:  # store last error
+        _torchforce_import_error = exc
+        continue
 
 
 # Order of species indices expected by ANI2x. (Subset typical for biomolecules.)
@@ -83,7 +88,8 @@ def build_ani_torch_force(
     """
     if TorchForce is None:  # pragma: no cover
         raise ImportError(
-            "openmm-torch not available. Install with: conda install -c conda-forge openmm-torch"
+            "openmm-torch plugin not importable (tried modules 'openmmtorch' and 'openmm_torch'). "
+            "Install or reinstall via: conda install -c conda-forge openmm-torch"
         ) from _torchforce_import_error
 
     from .ani import get_raw_ani_model
