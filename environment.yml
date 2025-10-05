@@ -4,17 +4,16 @@ channels:
 dependencies:
   - python=3.10
   - openmm=8.0.0
+  - openmm-torch  # for TorchForce (ANI in OpenMM)
   - ase
   - rdkit
   - pytorch  # conda-forge build (CPU or Metal acceleration on Apple Silicon)
-  - torchani
-  - openmm-torch  # for TorchForce (ANI in OpenMM)
   - pip
   - pip:
+      - -e external/torchani
       - -e .[dev]
 
 # Notes:
-# 1. Keeping everything (OpenMM, PyTorch, TorchANI) from conda-forge reduces risk of multiple libomp runtimes. (NOTE: TorchANI from conda-forge is v2.1.0 as of 2024-06-10, newer versions may be available via GitHub source.)
-# 2. For CUDA-enabled Linux systems, you can instead install the official CUDA PyTorch wheels and then add torchani via pip;
-#    but ensure only one OpenMP runtime by avoiding mixing system Homebrew llvm-openmp with conda-forge packages.
-# 3. If you previously installed torch via pip in this env, remove the env entirely before recreating to clear old libomp copies.
+# 1. TorchANI is installed from the submodule (editable) instead of the outdated conda-forge package.
+# 2. For CUDA-enabled Linux systems, you can instead install the official CUDA PyTorch wheels, then re-run: `pip install -e external/torchani`.
+# 3. Ensure only one OpenMP runtime (avoid mixing system Homebrew llvm-openmp with conda-forge packages).

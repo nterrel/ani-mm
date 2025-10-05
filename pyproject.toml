@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ani-mm"
 version = "0.2.0"
-description = "Hybrid ANI + OpenMM molecular modelling utilities"
+description = "TorchANI + OpenMM molecular modeling utilities"
 readme = "README.md"
 authors = [
   { name = "Nick Terrel", email = "nickterrel4@gmail.com" }
@@ -37,12 +37,9 @@ dev = [
   "black>=24.0.0",
   "isort>=5.12.0"
 ]
-# Stable (packaged) TorchANI release
+
+# TorchANI direct from GitHub main branch (can pin commit SHA instead of 'main')
 ml = [
-  "torchani",
-]
-# Bleeding edge TorchANI direct from GitHub main branch (can pin commit SHA instead of 'main')
-ml-git = [
   "torchani @ git+https://github.com/aiqm/torchani.git@main",
 ]
 
