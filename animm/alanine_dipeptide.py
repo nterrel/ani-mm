@@ -7,12 +7,17 @@ lightweight ASE + VelocityVerlet integrator using the TorchANI ASE interface.
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import contextlib
+import io
+import sys
 
-try:
-    import openmm
-    import openmm.app as app
-    import openmm.unit as unit
-except ImportError:  # pragma: no cover - optional dependency placeholder
+try:  # pragma: no cover - import guard
+    # swallow simtk deprecation line
+    with contextlib.redirect_stderr(io.StringIO()):
+        import openmm
+        import openmm.app as app
+        import openmm.unit as unit
+except Exception:  # pragma: no cover - optional dependency placeholder
     openmm = None  # type: ignore
     app = None  # type: ignore
     unit = None  # type: ignore
@@ -119,6 +124,7 @@ END
         build_ani_torch_force = None  # type: ignore
         engine = "ase"
 
+    initial_pot = None
     if engine == "openmm-torch" and build_ani_torch_force is not None:
         system = openmm.System()
         for atom in pdb.topology.atoms():
@@ -150,6 +156,60 @@ END
                 pass
         if minimize:
             sim.minimizeEnergy()
+        init_state = sim.context.getState(getEnergy=True, getVelocities=True)
+        initial_pot = init_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+        kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+        kB_kj = kB.value_in_unit(unit.kilojoule_per_mole / unit.kelvin)
+        try:
+            ke0 = init_state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)
+            dof = 3 * pdb.topology.getNumAtoms()
+            initial_temp = (2 * ke0) / (dof * kB_kj)
+        except Exception:
+            initial_temp = 0.0
+        if out_dcd:
+            sim.reporters.append(app.DCDReporter(out_dcd, report_interval))
+
+        class _DeltaReporter:  # pragma: no cover - simple formatted stdout reporter
+            """Lightweight reporter printing step, potential, delta, and temperature.
+
+            Implemented locally to avoid depending on OpenMM's StateDataReporter for
+            custom column ordering and delta energy column.
+            """
+
+            def __init__(self, interval: int, initial_pot_kj: float):
+                self.interval = interval
+                self.initial = initial_pot_kj
+                self._printed_header = False
+
+            def describeNextReport(self, simulation):  # noqa: N802
+                # OpenMM expects (nextStep, needPositions, needVelocities, needForces, needEnergy)
+                # We only require energies; positions/velocities/forces not needed.
+                return (self.interval, False, False, False, True)
+
+            def report(self, simulation, state):  # noqa: N802
+                pot = state.getPotentialEnergy().value_in_unit(
+                    unit.kilojoule_per_mole)  # type: ignore[attr-defined]
+                try:
+                    ke = state.getKineticEnergy().value_in_unit(
+                        unit.kilojoule_per_mole)  # type: ignore[attr-defined]
+                    dof_loc = 3 * simulation.topology.getNumAtoms()
+                    temp = (2 * ke) / (dof_loc * kB_kj)
+                except Exception:  # pragma: no cover - kinetic energy retrieval issues
+                    temp = float("nan")
+                delta = pot - self.initial
+                if not self._printed_header:
+                    sys.stdout.write(
+                        '#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
+                    self._printed_header = True
+                sys.stdout.write(
+                    f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
+                sys.stdout.flush()
+
+        # Attach our custom reporter last so header appears after any OpenMM messages
+        sim.reporters.append(_DeltaReporter(report_interval, initial_pot))
+        print(
+            f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
+        sys.stdout.flush()
         sim.step(n_steps)
         state = sim.context.getState(getEnergy=True)
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
@@ -163,7 +223,8 @@ END
         from .ani import load_ani_model  # reuse existing loader
 
         symbols = [atom.element.symbol for atom in pdb.topology.atoms()]
-        coords_ang = [(pos.x, pos.y, pos.z) for pos in pdb.positions]  # OpenMM gives nanometers
+        coords_ang = [(pos.x, pos.y, pos.z)
+                      for pos in pdb.positions]  # OpenMM gives nanometers
         # Convert nm -> Å
         coords_ang = [(x * 10.0, y * 10.0, z * 10.0) for x, y, z in coords_ang]
         ase_atoms = Atoms(symbols=symbols, positions=coords_ang)
@@ -185,30 +246,20 @@ END
         # Convert eV -> kJ/mol
         final_pot *= ase_units.kJ / ase_units.mol
     # Simple manual reporting placeholder (future: integrate reporters earlier)
-    if engine == "openmm-torch":
-        reporters = []
-        if out_dcd:
-            reporters.append(app.DCDReporter(out_dcd, report_interval))
-        reporters.append(
-            app.StateDataReporter(
-                file="-",
-                reportInterval=report_interval,
-                step=True,
-                potentialEnergy=True,
-                temperature=True,
-            )
-        )
-        for r in reporters:
-            # Reporters must be appended before stepping; we skipped that, so we warn.
-            # Minimizing complexity; future enhancement could restructure order.
-            pass
+    # Reporting handled inline above for openmm-torch; ASE path currently silent per-step.
     return {
         "steps": n_steps,
         "final_potential_kjmol": final_pot,
+        **(
+            {"initial_potential_kjmol": initial_pot}
+            if (engine == "openmm-torch" and initial_pot is not None)
+            else {}
+        ),
         "temperature_K": temperature,
         "dcd_path": out_dcd if engine == "openmm-torch" else None,
         "model": ani_model,
         "seed": seed,
         "minimized": minimize,
         "engine": engine,
+        "potential_delta_kjmol": (final_pot - initial_pot) if (engine == "openmm-torch" and initial_pot is not None) else None,
     }

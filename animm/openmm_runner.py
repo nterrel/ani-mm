@@ -1,8 +1,20 @@
-"""Simple OpenMM minimization + MD runner integrating ANI forces (placeholder)."""
+"""Generic OpenMM + TorchANI MD runner.
+
+Provides a reusable function ``run_ani_md`` that:
+
+* Builds an OpenMM ``System`` whose only force is a TorchANI ``TorchForce``.
+* Minimizes (optional) and runs Langevin dynamics with per-step force evaluation.
+* Supports on-the-fly trajectory capture (in-memory) and/or DCD writing.
+* Computes final potential energy and an estimate of the final temperature.
+
+The previous placeholder ``minimize_and_md`` is retained for backward compatibility
+but now calls into the new implementation (and is considered deprecated).
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 import numpy as np
 
@@ -17,22 +29,305 @@ except ImportError:  # pragma: no cover - optional dependency placeholder
 
 from ase import Atoms
 
+from .ani_openmm import build_ani_torch_force
+
+
+# ---------------------------------------------------------------------------
+# Data containers
+# ---------------------------------------------------------------------------
+
 
 @dataclass
 class MDState:
+    """Simplified MD trajectory state (legacy placeholder container)."""
+
     positions: np.ndarray  # (T, N, 3)
     velocities: np.ndarray  # (T, N, 3)
     time: np.ndarray  # (T,)
 
 
-def minimize_and_md(
-    ase_atoms: Atoms, ani_model, n_steps: int = 1000, temperature: float = 300.0, dt_fs: float = 0.5
-) -> MDState:
-    """Placeholder function: at this stage just returns initial state replicated.
+@dataclass
+class MDResult:
+    """Result object returned by ``run_ani_md``.
 
-    A future implementation will build an OpenMM System that queries ANI for forces.
+    Attributes
+    ----------
+    final_potential_kjmol: float
+        Final potential energy (kJ/mol).
+    final_temperature_K: float | None
+        Final instantaneous temperature estimate (Kelvin) or None if unavailable.
+    steps: int
+        Number of integration steps performed.
+    model: str
+        ANI model name used.
+    dtype: str
+        Precision of traced Torch module ('float64' or 'float32').
+    engine: str
+        Execution engine identifier (always 'openmm-torch' here on success).
+    positions: np.ndarray | None
+        Trajectory positions (frames, N, 3) in Å if collected, else None.
+    times_ps: np.ndarray | None
+        Simulation times corresponding to frames (ps) if collected.
+    dcd_path: str | None
+        Path to written DCD (if any).
+    reporter_outputs: List[str]
+        Any textual reporter output captured (for future extension).
     """
-    positions = np.repeat(np.expand_dims(ase_atoms.get_positions(), 0), repeats=2, axis=0)
+
+    final_potential_kjmol: float
+    final_temperature_K: Optional[float]
+    steps: int
+    model: str
+    dtype: str
+    engine: str
+    positions: Optional[np.ndarray] = None
+    times_ps: Optional[np.ndarray] = None
+    dcd_path: Optional[str] = None
+    reporter_outputs: List[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _ase_to_openmm_topology(ase_atoms: Atoms):
+    """Create a minimal OpenMM Topology and position list (nm) from ASE Atoms.
+
+    Bonds are omitted (ANI force does not require bonding terms). Periodic cell
+    is transferred if present and non-zero.
+    """
+    if app is None or unit is None:
+        raise ImportError(
+            "OpenMM is required to build a topology from ASE atoms")
+    top = app.Topology()
+    chain = top.addChain()
+    residue = top.addResidue("MOL", chain)
+    element_mod = app.element
+    for sym in ase_atoms.get_chemical_symbols():
+        el = element_mod.Element.getBySymbol(sym)
+        top.addAtom(sym, el, residue)
+    # Positions: ASE in Å -> convert to nm
+    pos_ang = ase_atoms.get_positions()  # Å
+    pos_nm = pos_ang * 0.1
+    positions = [openmm.Vec3(*xyz)
+                 for xyz in pos_nm]  # type: ignore[attr-defined]
+    box = ase_atoms.get_cell()  # (3,3) in Å
+    box_lengths = box.lengths() if hasattr(box, "lengths") else None
+    # set periodic box if non-trivial
+    if box_lengths and any(length > 1e-6 for length in box_lengths):
+        a, b, c = box_lengths
+        top.setPeriodicBoxVectors(
+            openmm.Vec3(a * 0.1, 0, 0),  # type: ignore[attr-defined]
+            openmm.Vec3(0, b * 0.1, 0),  # type: ignore[attr-defined]
+            openmm.Vec3(0, 0, c * 0.1),  # type: ignore[attr-defined]
+        )
+    return top, positions
+
+
+class _InMemoryReporter:
+    """Custom reporter that captures positions in-memory at a specified interval."""
+
+    def __init__(self, interval: int):
+        self._interval = int(interval)
+        self.frames: List[np.ndarray] = []
+        self.times_ps: List[float] = []
+
+    def describeNextReport(self, simulation):  # noqa: N802 (OpenMM API naming)
+        return (self._interval, True, False, False, False, True, False)
+
+    def report(self, simulation, state):  # noqa: N802
+        # Positions in nm -> convert to Å for user friendliness
+        pos = state.getPositions(asNumpy=True).value_in_unit(
+            unit.nanometer) * 10.0  # type: ignore[attr-defined]
+        self.frames.append(np.array(pos, dtype=float))
+        self.times_ps.append(state.getTime().value_in_unit(
+            unit.picosecond))  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def run_ani_md(
+    ase_atoms: Atoms,
+    model: str = "ANI2DR",
+    n_steps: int = 1000,
+    temperature_K: float = 300.0,
+    friction_per_ps: float = 1.0,
+    dt_fs: float = 1.0,
+    platform: str | None = None,
+    minimize: bool = True,
+    report_interval: int = 100,
+    dcd_path: str | None = None,
+    collect_trajectory: bool = False,
+    dtype: str = "float64",
+    ani_threads: int | None = None,
+    seed: int | None = None,
+) -> MDResult:
+    """Run Langevin dynamics of an arbitrary ASE Atoms object with ANI forces.
+
+    Parameters
+    ----------
+    ase_atoms : Atoms
+        Input coordinates (Å) and atomic species.
+    model : str
+        ANI model name (case-insensitive, e.g. ANI2DR, ANI2X).
+    n_steps : int
+        Number of integration steps.
+    temperature_K : float
+        Target thermostat temperature (Kelvin).
+    friction_per_ps : float
+        Langevin friction (1/ps).
+    dt_fs : float
+        Time step (fs).
+    platform : str | None
+        OpenMM platform name (e.g. CUDA, CPU). Auto if None.
+    minimize : bool
+        Whether to perform energy minimization before dynamics.
+    report_interval : int
+        Interval (steps) for reporters and optional trajectory capture.
+    dcd_path : str | None
+        If provided, write a DCD trajectory at the report interval.
+    collect_trajectory : bool
+        If True, store positions (Å) in-memory at each report interval (including initial frame).
+    dtype : str
+        Torch dtype for tracing ('float64' default, falls back internally if unsupported).
+    ani_threads : int | None
+        Override torch thread count for force evaluation.
+    seed : int | None
+        Random seed for integrator RNG.
+    """
+    if openmm is None or app is None or unit is None:
+        raise ImportError("OpenMM (and openmm-torch) required for run_ani_md")
+
+    topology, positions_nm = _ase_to_openmm_topology(ase_atoms)
+
+    # Build System: add particles with proper masses
+    system = openmm.System()
+    for atom in topology.atoms():
+        system.addParticle(atom.element.mass)
+
+    # Attach ANI TorchForce
+    ani_force = build_ani_torch_force(
+        topology=topology, model_name=model, dtype=dtype, threads=ani_threads
+    )
+    system.addForce(ani_force)
+
+    # Integrator & Simulation
+    dt_ps = dt_fs * 1e-3
+    integrator = openmm.LangevinIntegrator(  # type: ignore[attr-defined]
+        temperature_K * unit.kelvin,  # type: ignore[attr-defined]
+        friction_per_ps / unit.picosecond,  # type: ignore[attr-defined]
+        dt_ps * unit.picosecond,  # type: ignore[attr-defined]
+    )
+    if seed is not None:
+        try:  # pragma: no cover - integrator attribute differences
+            integrator.setRandomNumberSeed(int(seed))
+        except Exception:
+            pass
+    use_platform = None
+    if platform:
+        use_platform = openmm.Platform.getPlatformByName(platform)
+    sim = app.Simulation(topology, system, integrator, use_platform)
+    sim.context.setPositions(positions_nm)
+
+    # Minimization
+    if minimize:
+        sim.minimizeEnergy()
+
+    # Reporters
+    inmem_reporter = None
+    if collect_trajectory:
+        inmem_reporter = _InMemoryReporter(report_interval)
+        sim.reporters.append(inmem_reporter)
+    if dcd_path:
+        sim.reporters.append(app.DCDReporter(dcd_path, report_interval))
+    # Always add a lightweight state reporter to STDOUT disabled by default? (Skipped for library)
+
+    # Ensure we capture initial frame if collecting
+    if collect_trajectory:
+        state0 = sim.context.getState(
+            getPositions=True, enforcePeriodicBox=False)
+        inmem_reporter.report(sim, state0)  # type: ignore[arg-type]
+
+    sim.step(int(n_steps))
+
+    # Final state
+    final_state = sim.context.getState(
+        getEnergy=True, getPositions=True, getVelocities=True)
+    potential = final_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+    kinetic = None
+    temperature_final = None
+    try:
+        kinetic = final_state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)
+    except Exception:  # pragma: no cover - some builds may need velocities flag
+        pass
+    if kinetic is not None:
+        # T = 2 KE / (dof * kB). Use approximate dof = 3N (no constraints assumed)
+        kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+        kB_kj_per_mol_K = kB.value_in_unit(
+            unit.kilojoule_per_mole / unit.kelvin)
+        dof = 3 * topology.getNumAtoms()
+        temperature_final = (2.0 * kinetic) / (dof * kB_kj_per_mol_K)
+
+    traj_positions = None
+    times_ps = None
+    if collect_trajectory and inmem_reporter is not None:
+        traj_positions = np.stack(inmem_reporter.frames, axis=0)
+        times_ps = np.array(inmem_reporter.times_ps)
+
+    # Determine traced dtype actually used (inspect internal cache key if needed)
+    # heuristic; build_ani_torch_force updates cache key but we did not expose it
+    actual_dtype = dtype
+
+    return MDResult(
+        final_potential_kjmol=float(potential),
+        final_temperature_K=temperature_final,
+        steps=int(n_steps),
+        model=model.upper(),
+        dtype=actual_dtype,
+        engine="openmm-torch",
+        positions=traj_positions,
+        times_ps=times_ps,
+        dcd_path=dcd_path,
+    )
+
+
+def minimize_and_md(
+    ase_atoms: Atoms,
+    ani_model,
+    n_steps: int = 1000,
+    temperature: float = 300.0,
+    dt_fs: float = 0.5,
+) -> MDState:  # pragma: no cover - thin wrapper
+    """Deprecated placeholder maintained for backward compatibility.
+
+    Delegates to ``run_ani_md`` (without trajectory collection) and returns a
+    very small ``MDState`` snapshot consisting of initial & final positions.
+    """
+    res = run_ani_md(
+        ase_atoms=ase_atoms,
+        model=ani_model,
+        n_steps=n_steps,
+        temperature_K=temperature,
+        dt_fs=dt_fs,
+        report_interval=n_steps,  # only initial + final if trajectory collected
+        collect_trajectory=True,
+        minimize=True,
+    )
+    if res.positions is not None and res.positions.shape[0] >= 2:
+        positions = res.positions[:2]
+    else:  # fallback synthetic
+        positions = np.repeat(np.expand_dims(
+            ase_atoms.get_positions(), 0), repeats=2, axis=0)
     velocities = np.zeros_like(positions)
     time = np.array([0.0, n_steps * dt_fs * 1e-3])
     return MDState(positions=positions, velocities=velocities, time=time)
+
+
+__all__ = [
+    "run_ani_md",
+    "MDResult",
+    "MDState",
+    "minimize_and_md",
+]
