@@ -27,8 +27,7 @@ def test_species_tensor_uses_atomic_numbers():
             pdb.topology, model_name="ANI2DR", dtype="float64", cache=False
         )  # noqa: F841
     except ImportError:
-        pytest.skip(
-            "TorchForce / openmm-torch not available in this test environment")
+        pytest.skip("TorchForce / openmm-torch not available in this test environment")
 
     # Indirect validation: traced module stored in cache contains species buffer of atomic numbers.
     # Pull a traced module from internal cache if present.
@@ -50,7 +49,6 @@ def test_species_tensor_uses_atomic_numbers():
             assert species_list.count(1) == 4
             break
     else:
-        pytest.skip(
-            "Traced module not cached; unable to inspect species tensor")
+        pytest.skip("Traced module not cached; unable to inspect species tensor")
 
     clear_traced_cache()
