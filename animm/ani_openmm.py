@@ -48,8 +48,7 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         # positions_nm shape (N, 3) in nm (OpenMM convention). Cast to model dtype.
         # type: ignore[stop-iteration]
         model_dtype = next(self.ani_model.parameters()).dtype
-        pos_ang = positions_nm.to(model_dtype).unsqueeze(
-            0) * 10.0  # (1, N, 3) Å
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -128,8 +127,7 @@ def build_ani_torch_force(
     if cache and key in _TRACED_CACHE:
         traced = _TRACED_CACHE[key]
     else:
-        example = torch.zeros(
-            (n_atoms, 3), dtype=getattr(torch, requested_dtype))
+        example = torch.zeros((n_atoms, 3), dtype=getattr(torch, requested_dtype))
         try:
             with torch.no_grad():  # tracing only
                 traced = torch.jit.trace(module, example)

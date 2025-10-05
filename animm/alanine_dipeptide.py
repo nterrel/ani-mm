@@ -7,10 +7,10 @@ production workflow.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
 import contextlib
 import io
 import sys
+from typing import Any, Dict, Optional
 
 try:  # pragma: no cover - import guard
     # swallow simtk deprecation line
@@ -36,6 +36,8 @@ def simulate_alanine_dipeptide(
     ani_threads: Optional[int] = None,
     seed: Optional[int] = None,
     minimize: bool = True,
+    live_view: bool = False,
+    live_backend: str = "auto",
 ) -> Dict[str, Any]:
     """Run a short gas‐phase alanine dipeptide simulation.
 
@@ -63,6 +65,10 @@ def simulate_alanine_dipeptide(
         Random seed for the Langevin integrator RNG.
     minimize: bool
         If True (default) run an energy minimization before dynamics.
+    live_view: bool
+        If True, enable a lightweight live viewer (desktop). Optional.
+    live_backend: str
+        Backend for live viewer ('auto', 'ase', 'mpl').
 
     Returns
     -------
@@ -170,6 +176,24 @@ END
             initial_temp = 0.0
         if out_dcd:
             sim.reporters.append(app.DCDReporter(out_dcd, report_interval))
+        # Live viewer (optional)
+        live_viewer = None
+        if live_view:
+            try:  # pragma: no cover - GUI optional
+                symbols = [a.element.symbol for a in pdb.topology.atoms()]
+                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0) for pos in pdb.positions]
+                import numpy as _np
+                from .gui import build_live_viewer_reporter  # type: ignore
+
+                live_viewer, live_reporter = build_live_viewer_reporter(
+                    symbols,
+                    interval=report_interval,
+                    backend=live_backend,
+                    initial_positions_ang=_np.asarray(initial_ang, dtype=float),
+                )
+                sim.reporters.append(live_reporter)
+            except Exception:
+                live_viewer = None
 
         class _DeltaReporter:  # pragma: no cover - simple formatted stdout reporter
             """Lightweight reporter printing step, potential, delta, and temperature.
@@ -190,31 +214,35 @@ END
 
             def report(self, simulation, state):  # noqa: N802
                 pot = state.getPotentialEnergy().value_in_unit(
-                    unit.kilojoule_per_mole)  # type: ignore[attr-defined]
+                    unit.kilojoule_per_mole
+                )  # type: ignore[attr-defined]
                 try:
                     ke = state.getKineticEnergy().value_in_unit(
-                        unit.kilojoule_per_mole)  # type: ignore[attr-defined]
+                        unit.kilojoule_per_mole
+                    )  # type: ignore[attr-defined]
                     dof_loc = 3 * simulation.topology.getNumAtoms()
                     temp = (2 * ke) / (dof_loc * kB_kj)
                 except Exception:  # pragma: no cover - kinetic energy retrieval issues
                     temp = float("nan")
                 delta = pot - self.initial
                 if not self._printed_header:
-                    sys.stdout.write(
-                        '#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
+                    sys.stdout.write('#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
                     self._printed_header = True
-                sys.stdout.write(
-                    f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
+                sys.stdout.write(f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
                 sys.stdout.flush()
 
         # Attach our custom reporter last so header appears after any OpenMM messages
         sim.reporters.append(_DeltaReporter(report_interval, initial_pot))
-        print(
-            f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
+        print(f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
         sys.stdout.flush()
         sim.step(n_steps)
         state = sim.context.getState(getEnergy=True)
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+        try:  # finalize viewer
+            if live_view and live_viewer is not None and getattr(live_viewer, "enabled", False):  # pragma: no cover - GUI
+                live_viewer.finalize()  # type: ignore
+        except Exception:  # pragma: no cover
+            pass
     else:
         # ASE fallback: build Atoms and run simple velocity Verlet MD with ANI calculator.
         from ase import Atoms  # type: ignore
@@ -225,8 +253,7 @@ END
         from .ani import load_ani_model  # reuse existing loader
 
         symbols = [atom.element.symbol for atom in pdb.topology.atoms()]
-        coords_ang = [(pos.x, pos.y, pos.z)
-                      for pos in pdb.positions]  # OpenMM gives nanometers
+        coords_ang = [(pos.x, pos.y, pos.z) for pos in pdb.positions]  # OpenMM gives nanometers
         # Convert nm -> Å
         coords_ang = [(x * 10.0, y * 10.0, z * 10.0) for x, y, z in coords_ang]
         ase_atoms = Atoms(symbols=symbols, positions=coords_ang)
@@ -263,5 +290,9 @@ END
         "seed": seed,
         "minimized": minimize,
         "engine": engine,
-        "potential_delta_kjmol": (final_pot - initial_pot) if (engine == "openmm-torch" and initial_pot is not None) else None,
+        "potential_delta_kjmol": (
+            (final_pot - initial_pot)
+            if (engine == "openmm-torch" and initial_pot is not None)
+            else None
+        ),
     }

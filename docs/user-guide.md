@@ -85,3 +85,30 @@ RDKit is preferred when installed; a fallback builder is used otherwise.
 ## 9. Next Steps
 
 See the API Reference for deeper details and the Development page if you plan to contribute.
+
+## 10. Live Desktop Viewer (Experimental)
+
+You can open a lightweight live viewer window during MD:
+
+Command line (alanine example):
+
+```bash
+python -m animm.cli ala2-md --steps 1000 --live-view --live-backend auto
+```
+
+Programmatic (generic MD runner):
+
+```python
+from animm.convert import smiles_to_ase
+from animm.openmm_runner import run_ani_md
+
+atoms = smiles_to_ase("CCO")
+res = run_ani_md(atoms, n_steps=500, live_view=True, live_interval=50)
+```
+
+Backends:
+* auto – prefer ASE GUI if available, fallback to Matplotlib.
+* ase – force ASE GUI.
+* mpl – force Matplotlib scatter.
+
+If no GUI backend is available (e.g. headless CI), it silently disables itself.

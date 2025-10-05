@@ -52,8 +52,7 @@ if os.environ.get("ANIMM_NO_OMP") == "1":  # pragma: no cover - environment spec
 
 
 def main(argv: list[str] | None = None):
-    parser = argparse.ArgumentParser(
-        prog="ani-mm", description="ANI + OpenMM utilities")
+    parser = argparse.ArgumentParser(prog="ani-mm", description="ANI + OpenMM utilities")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     parser.add_argument(
@@ -75,23 +74,17 @@ def main(argv: list[str] | None = None):
         default="ANI2DR",
         help="ANI model name (default: ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
     )
-    p_eval.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_eval.add_argument("--json", action="store_true", help="Emit JSON instead of text")
 
-    p_ala2 = sub.add_parser(
-        "ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
-    p_ala2.add_argument("--steps", type=int, default=2000,
-                        help="Number of MD steps (default 2000)")
-    p_ala2.add_argument("--t", type=float, default=300.0,
-                        help="Temperature in K (default 300)")
-    p_ala2.add_argument("--dt", type=float, default=2.0,
-                        help="Timestep in fs (default 2.0)")
-    p_ala2.add_argument("--report", type=int, default=50,
-                        help="Report interval (steps, default 50)")
-    p_ala2.add_argument("--dcd", default=None,
-                        help="Optional DCD trajectory output path")
-    p_ala2.add_argument("--platform", default=None,
-                        help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_ala2 = sub.add_parser("ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
+    p_ala2.add_argument("--steps", type=int, default=2000, help="Number of MD steps (default 2000)")
+    p_ala2.add_argument("--t", type=float, default=300.0, help="Temperature in K (default 300)")
+    p_ala2.add_argument("--dt", type=float, default=2.0, help="Timestep in fs (default 2.0)")
+    p_ala2.add_argument(
+        "--report", type=int, default=50, help="Report interval (steps, default 50)"
+    )
+    p_ala2.add_argument("--dcd", default=None, help="Optional DCD trajectory output path")
+    p_ala2.add_argument("--platform", default=None, help="OpenMM platform name (e.g. CUDA, CPU)")
     p_ala2.add_argument(
         "--ani-model",
         default="ANI2DR",
@@ -100,12 +93,20 @@ def main(argv: list[str] | None = None):
     p_ala2.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
-    p_ala2.add_argument("--seed", type=int, default=None,
-                        help="Random seed for integrator RNG")
-    p_ala2.add_argument("--no-min", action="store_true",
-                        help="Skip energy minimization")
-    p_ala2.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_ala2.add_argument("--seed", type=int, default=None, help="Random seed for integrator RNG")
+    p_ala2.add_argument("--no-min", action="store_true", help="Skip energy minimization")
+    p_ala2.add_argument("--json", action="store_true", help="Emit JSON instead of text")
+    p_ala2.add_argument(
+        "--live-view",
+        action="store_true",
+        help="Enable live desktop viewer (ASE GUI preferred, fallback matplotlib)",
+    )
+    p_ala2.add_argument(
+        "--live-backend",
+        default="auto",
+        choices=["auto", "ase", "mpl"],
+        help="Force live viewer backend (default auto)",
+    )
 
     p_models = sub.add_parser("models", help="List available ANI models")
     p_models.add_argument("--json", action="store_true", help="Emit JSON list")
@@ -116,8 +117,7 @@ def main(argv: list[str] | None = None):
     if args.allow_dup_omp:  # pragma: no cover - environment specific
         os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
-    logging.basicConfig(level=getattr(
-        logging, args.log_level.upper(), logging.WARNING))
+    logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.WARNING))
 
     # Lazy import heavy torch/openmm dependent modules after env tweaks
     from .ani import ani_energy_forces, list_available_ani_models, load_ani_model  # noqa: WPS433
@@ -158,6 +158,7 @@ def main(argv: list[str] | None = None):
 
     if args.cmd == "ala2-md":
         from .alanine_dipeptide import simulate_alanine_dipeptide  # noqa: WPS433
+
         if args.json:
             # Suppress internal stdout (reporter + initial potential) so we emit pure JSON
             with contextlib.redirect_stdout(io.StringIO()):
@@ -172,6 +173,8 @@ def main(argv: list[str] | None = None):
                     ani_threads=args.ani_threads,
                     seed=args.seed,
                     minimize=not args.no_min,
+                    live_view=args.live_view,
+                    live_backend=args.live_backend,
                 )
             print(json.dumps(sim_info))
         else:
@@ -186,11 +189,12 @@ def main(argv: list[str] | None = None):
                 ani_threads=args.ani_threads,
                 seed=args.seed,
                 minimize=not args.no_min,
+                live_view=args.live_view,
+                live_backend=args.live_backend,
             )
             extra = ""
             if "initial_potential_kjmol" in sim_info:
-                delta = sim_info["final_potential_kjmol"] - \
-                    sim_info["initial_potential_kjmol"]
+                delta = sim_info["final_potential_kjmol"] - sim_info["initial_potential_kjmol"]
                 extra = f" initial_potential={sim_info['initial_potential_kjmol']:.2f} delta={delta:.2f}"
             print(
                 f"Finished steps={sim_info['steps']} model={sim_info['model']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol{extra}"

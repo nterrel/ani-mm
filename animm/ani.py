@@ -89,9 +89,7 @@ def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
     try:
         forces = ani_model.get_forces(ase_atoms)
     except Exception as exc:  # pragma: no cover - unexpected API change
-        raise RuntimeError(
-            "Unable to retrieve forces via TorchANI ASE interface"
-        ) from exc
+        raise RuntimeError("Unable to retrieve forces via TorchANI ASE interface") from exc
     return ANIEvaluation(
         energy=torch.tensor([energy], dtype=torch.float64),
         forces=torch.tensor(forces, dtype=torch.float64),

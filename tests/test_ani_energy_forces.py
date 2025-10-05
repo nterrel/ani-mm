@@ -1,6 +1,6 @@
 import pytest
 
-from animm.ani import load_ani_model, ani_energy_forces
+from animm.ani import ani_energy_forces, load_ani_model
 from animm.convert import smiles_to_ase
 
 
@@ -13,5 +13,4 @@ def test_ani_energy_forces_ethanol():
     assert eval_res.forces.shape[1] == 3
     assert eval_res.forces.shape[0] == len(atoms)
     # Energy should be finite
-    assert float(eval_res.energy.item()) == pytest.approx(
-        eval_res.energy.item())
+    assert float(eval_res.energy.item()) == pytest.approx(eval_res.energy.item())

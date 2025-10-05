@@ -31,7 +31,6 @@ from ase import Atoms
 
 from .ani_openmm import build_ani_torch_force
 
-
 # ---------------------------------------------------------------------------
 # Data containers
 # ---------------------------------------------------------------------------
@@ -90,6 +89,7 @@ class MDResult:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _ase_to_openmm_topology(ase_atoms: Atoms):
     """Create a minimal (non‑bonded) OpenMM topology + positions (nm).
 
@@ -97,8 +97,7 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
     only if any cell axis is non‑zero.
     """
     if app is None or unit is None:
-        raise ImportError(
-            "OpenMM is required to build a topology from ASE atoms")
+        raise ImportError("OpenMM is required to build a topology from ASE atoms")
     top = app.Topology()
     chain = top.addChain()
     residue = top.addResidue("MOL", chain)
@@ -109,8 +108,7 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
     # Positions: ASE in Å -> convert to nm
     pos_ang = ase_atoms.get_positions()  # Å
     pos_nm = pos_ang * 0.1
-    positions = [openmm.Vec3(*xyz)
-                 for xyz in pos_nm]  # type: ignore[attr-defined]
+    positions = [openmm.Vec3(*xyz) for xyz in pos_nm]  # type: ignore[attr-defined]
     box = ase_atoms.get_cell()  # (3,3) in Å (may be all zeros for non-periodic)
     lengths = None
     if hasattr(box, "lengths"):
@@ -147,16 +145,19 @@ class _InMemoryReporter:
 
     def report(self, simulation, state):  # noqa: N802
         # Positions in nm -> convert to Å for user friendliness
-        pos = state.getPositions(asNumpy=True).value_in_unit(
-            unit.nanometer) * 10.0  # type: ignore[attr-defined]
+        pos = (
+            state.getPositions(asNumpy=True).value_in_unit(unit.nanometer) * 10.0
+        )  # type: ignore[attr-defined]
         self.frames.append(np.array(pos, dtype=float))
-        self.times_ps.append(state.getTime().value_in_unit(
-            unit.picosecond))  # type: ignore[attr-defined]
+        self.times_ps.append(
+            state.getTime().value_in_unit(unit.picosecond)
+        )  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def run_ani_md(
     ase_atoms: Atoms,
@@ -276,15 +277,13 @@ def run_ani_md(
 
     # Ensure we capture initial frame if collecting
     if collect_trajectory:
-        state0 = sim.context.getState(
-            getPositions=True, enforcePeriodicBox=False)
+        state0 = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
         inmem_reporter.report(sim, state0)  # type: ignore[arg-type]
 
     sim.step(int(n_steps))
 
     # Final state
-    final_state = sim.context.getState(
-        getEnergy=True, getPositions=True, getVelocities=True)
+    final_state = sim.context.getState(getEnergy=True, getPositions=True, getVelocities=True)
     potential = final_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
     kinetic = None
     temperature_final = None
@@ -295,8 +294,7 @@ def run_ani_md(
     if kinetic is not None:
         # T = 2 KE / (dof * kB). Use approximate dof = 3N (no constraints assumed)
         kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
-        kB_kj_per_mol_K = kB.value_in_unit(
-            unit.kilojoule_per_mole / unit.kelvin)
+        kB_kj_per_mol_K = kB.value_in_unit(unit.kilojoule_per_mole / unit.kelvin)
         dof = 3 * topology.getNumAtoms()
         temperature_final = (2.0 * kinetic) / (dof * kB_kj_per_mol_K)
 
@@ -354,8 +352,7 @@ def minimize_and_md(
     if res.positions is not None and res.positions.shape[0] >= 2:
         positions = res.positions[:2]
     else:  # fallback synthetic
-        positions = np.repeat(np.expand_dims(
-            ase_atoms.get_positions(), 0), repeats=2, axis=0)
+        positions = np.repeat(np.expand_dims(ase_atoms.get_positions(), 0), repeats=2, axis=0)
     velocities = np.zeros_like(positions)
     time = np.array([0.0, n_steps * dt_fs * 1e-3])
     return MDState(positions=positions, velocities=velocities, time=time)
