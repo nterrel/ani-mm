@@ -13,19 +13,19 @@ Provide small, composable helpers to:
 3. Evaluate ANI energies & forces (ASE interface) in double precision by default.
 4. Construct an OpenMM `TorchForce` wrapping an ANI model (via `openmm-torch`).
 5. Run a minimal alanine dipeptide vacuum MD example (OpenMM when TorchForce available, else ASE fallback).
+6. Generic reusable `run_ani_md` function for arbitrary ASE `Atoms` with optional in-memory trajectory capture and DCD output.
 
-Planned (not fully implemented yet):
+Planned (not implemented yet):
 
-* True per-step force recomputation in a reusable dynamics runner (the current alanine helper does, but the generic `openmm_runner` is still a placeholder).
-* Reporting & trajectory output wiring earlier in the simulation lifecycle.
-* Periodic boundary & cutoff-aware variants (when appropriate TorchANI models available).
+* Periodic boundary & cutoff-aware variants (when suitable TorchANI models / parameters are available).
+* Mixed precision / performance tuning switches (explicit autocast, optional half precision on supported hardware).
+* Richer reporter composition (JSON/CSV loggers, force/temperature statistics, checkpointing).
 
 ## Install (development)
 
 TorchANI is vendored as a git submodule. The recommended (minimal) workflow installs everything—TorchANI included—via the Conda environment file and then installs this package once.
 
 ### Quick Start (recommended)
-
 
 ```bash
 git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
@@ -115,22 +115,20 @@ The helper will:
 
 Limitations (0.2.x):
 
-* The generic `openmm_runner.minimize_and_md` is a stub (does not yet perform time integration with force updates). Use the CLI alanine example for real dynamics until the runner is implemented.
-* No periodic systems / cutoffs.
-* No long trajectory conveniences (checkpointing, logging) yet.
-* Reporter attachment order in alanine helper is simplified; early reporters will be added in a future revision.
-
-Planned next: implement a reusable MD driver that reuses the traced ANI module each step and supports optional mixed precision.
+* No periodic systems / cutoffs yet (vacuum / gas-phase only).
+* No restart/checkpoint file support.
+* Alanine helper uses a lightweight custom stdout reporter (potential/Δ/temperature) – richer structured logging pending.
+* `run_ani_md` currently infers actual traced dtype heuristically (reported dtype is the requested one; float64 may internally downgrade if tracing fails and cache key changes).
 
 ### Warning Suppression
 
-The package suppresses a few known noisy warnings:
+The package suppresses a few known noisy warnings (via `warnings.filterwarnings` and selective stderr redirection during critical imports):
 
-* Deprecated `simtk.openmm` import notices.
+* Deprecated `simtk.openmm` import notices (emitted by third-party legacy compatibility imports).
 * Experimental TorchANI model (ANI-2xr) user warning.
 * `pkg_resources` deprecation warning triggered during TorchANI import.
 
-You can re-enable them by running with Python's warnings reset (e.g. `PYTHONWARNINGS=default`).
+Re-enable them with: `PYTHONWARNINGS=default` or by editing the filters in `animm/__init__.py` and `animm/cli.py`.
 
 ### Precision
 
@@ -150,16 +148,37 @@ to manually flush the cache.
 ## Roadmap (high-level)
 
 * [x] Basic ANI energy/force evaluation wrapper
-* [x] ASE <-> OpenMM conversion helpers (initial)
+* [x] ASE <-> OpenMM conversion helpers
 * [x] OpenMM TorchForce integration (ANI-only)
 * [x] Alanine dipeptide vacuum MD example
 * [x] Warning suppression & model name normalization
 * [x] Double precision default + float32 fallback
-* [ ] Generic MD runner (force updates each step) replacing placeholder
-* [ ] Proper reporters & trajectory outputs for arbitrary systems
+* [x] Generic MD runner (`run_ani_md`) with optional in-memory trajectory
+* [ ] Rich reporter & logging framework (CSV/JSON, progress bars)
 * [ ] Periodic system support (when suitable models available)
 * [ ] Mixed precision / performance tuning knobs
 * [ ] CI matrix for (CPU / GPU) and float32/float64 tracing
+* [ ] Checkpoint / restart support
+
+## Tests
+
+Core tests live in `tests/` (TorchANI's own comprehensive suite is vendored under `external/torchani/tests`). Current project-specific tests include:
+
+* Species tensor uses atomic numbers (`test_species_tensor.py`).
+
+Planned near-term additions:
+
+* `test_run_ani_md_basic`: short 10–20 step MD with in-memory trajectory collection verifying frame count and energy units.
+* `test_run_ani_md_minimize_effect`: ensure minimization reduces (or does not increase) potential energy vs. unminimized first step for a small structure (tolerant assertion).
+* `test_tracing_dtype_fallback`: simulate (by forcing an unsupported dtype) that float64 fallback to float32 traces without raising.
+* `test_invalid_model_name`: invalid ANI model raises a `ValueError` listing supported models.
+* `test_cache_reuse`: building the same TorchForce twice reuses traced module (no duplicate trace) – can be approximated by inspecting cache size.
+
+Run tests:
+
+```bash
+pytest -q
+```
 
 ## License
 

@@ -10,6 +10,8 @@ Mitigations:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import logging
 import os
@@ -157,22 +159,35 @@ def main(argv: list[str] | None = None):
 
     if args.cmd == "ala2-md":
         from .alanine_dipeptide import simulate_alanine_dipeptide  # noqa: WPS433
-
-        sim_info = simulate_alanine_dipeptide(
-            n_steps=args.steps,
-            temperature=args.t,
-            timestep_fs=args.dt,
-            report_interval=args.report,
-            out_dcd=args.dcd,
-            platform_name=args.platform,
-            ani_model=args.ani_model,
-            ani_threads=args.ani_threads,
-            seed=args.seed,
-            minimize=not args.no_min,
-        )
         if args.json:
+            # Suppress internal stdout (reporter + initial potential) so we emit pure JSON
+            with contextlib.redirect_stdout(io.StringIO()):
+                sim_info = simulate_alanine_dipeptide(
+                    n_steps=args.steps,
+                    temperature=args.t,
+                    timestep_fs=args.dt,
+                    report_interval=args.report,
+                    out_dcd=args.dcd,
+                    platform_name=args.platform,
+                    ani_model=args.ani_model,
+                    ani_threads=args.ani_threads,
+                    seed=args.seed,
+                    minimize=not args.no_min,
+                )
             print(json.dumps(sim_info))
         else:
+            sim_info = simulate_alanine_dipeptide(
+                n_steps=args.steps,
+                temperature=args.t,
+                timestep_fs=args.dt,
+                report_interval=args.report,
+                out_dcd=args.dcd,
+                platform_name=args.platform,
+                ani_model=args.ani_model,
+                ani_threads=args.ani_threads,
+                seed=args.seed,
+                minimize=not args.no_min,
+            )
             extra = ""
             if "initial_potential_kjmol" in sim_info:
                 delta = sim_info["final_potential_kjmol"] - \

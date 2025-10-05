@@ -111,16 +111,25 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
     pos_nm = pos_ang * 0.1
     positions = [openmm.Vec3(*xyz)
                  for xyz in pos_nm]  # type: ignore[attr-defined]
-    box = ase_atoms.get_cell()  # (3,3) in Å
-    box_lengths = box.lengths() if hasattr(box, "lengths") else None
-    # set periodic box if non-trivial
-    if box_lengths and any(length > 1e-6 for length in box_lengths):
-        a, b, c = box_lengths
-        top.setPeriodicBoxVectors(
-            openmm.Vec3(a * 0.1, 0, 0),  # type: ignore[attr-defined]
-            openmm.Vec3(0, b * 0.1, 0),  # type: ignore[attr-defined]
-            openmm.Vec3(0, 0, c * 0.1),  # type: ignore[attr-defined]
-        )
+    box = ase_atoms.get_cell()  # (3,3) in Å (may be all zeros for non-periodic)
+    lengths = None
+    if hasattr(box, "lengths"):
+        try:  # pragma: no cover - defensive
+            lengths = box.lengths()
+        except Exception:
+            lengths = None
+    if lengths is not None:
+        import numpy as _np
+
+        arr = _np.asarray(lengths, dtype=float)
+        # Treat as periodic only if any dimension is meaningfully non-zero (> 1e-6 Å)
+        if _np.any(arr > 1e-6):
+            a, b, c = arr.tolist()
+            top.setPeriodicBoxVectors(
+                openmm.Vec3(a * 0.1, 0, 0),  # type: ignore[attr-defined]
+                openmm.Vec3(0, b * 0.1, 0),  # type: ignore[attr-defined]
+                openmm.Vec3(0, 0, c * 0.1),  # type: ignore[attr-defined]
+            )
     return top, positions
 
 
@@ -133,7 +142,8 @@ class _InMemoryReporter:
         self.times_ps: List[float] = []
 
     def describeNextReport(self, simulation):  # noqa: N802 (OpenMM API naming)
-        return (self._interval, True, False, False, False, True, False)
+        # Return standard 5-tuple: (nextStep, needPositions, needVelocities, needForces, needEnergy)
+        return (self._interval, True, False, False, False)
 
     def report(self, simulation, state):  # noqa: N802
         # Positions in nm -> convert to Å for user friendliness
@@ -278,7 +288,7 @@ def run_ani_md(
 
     # Determine traced dtype actually used (inspect internal cache key if needed)
     # heuristic; build_ani_torch_force updates cache key but we did not expose it
-    actual_dtype = dtype
+    actual_dtype = getattr(ani_force, "_animm_traced_dtype", dtype)
 
     return MDResult(
         final_potential_kjmol=float(potential),

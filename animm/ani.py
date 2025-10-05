@@ -45,7 +45,8 @@ def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
 
 
 def load_ani_model(model_name: str = DEFAULT_MODEL):
-    return get_raw_ani_model(model_name).ase()
+    # TorchANI model exposes .ase() to build an ASE-compatible wrapper
+    return get_raw_ani_model(model_name).ase()  # type: ignore[attr-defined]
 
 
 def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
@@ -65,10 +66,15 @@ def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
 
     Returns energy (Hartree) and forces (Hartree/Bohr).
     """
-    # TorchANI ASE interface returns energy in Hartree and forces in Hartree/Bohr
-    energy = ani_model.get_potential_energy(ase_atoms, include_forces=True)
-    # The ase() wrapper stores last results in model.atoms.calc.results
-    forces = ani_model.atoms.calc.results["forces"]  # type: ignore[index]
+    # TorchANI ASE wrapper exposes both get_potential_energy(atoms) and get_forces(atoms)
+    # returning energy in Hartree and forces in Hartree/Bohr.
+    energy = ani_model.get_potential_energy(ase_atoms)
+    try:
+        forces = ani_model.get_forces(ase_atoms)
+    except Exception as exc:  # pragma: no cover - unexpected API change
+        raise RuntimeError(
+            "Unable to retrieve forces via TorchANI ASE interface"
+        ) from exc
     return ANIEvaluation(
         energy=torch.tensor([energy], dtype=torch.float64),
         forces=torch.tensor(forces, dtype=torch.float64),
