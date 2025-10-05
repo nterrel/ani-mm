@@ -10,7 +10,8 @@ OpenMM can obtain energies (and forces via autograd) each integration step.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Dict, Tuple
+import logging
 
 import torch
 
@@ -26,9 +27,6 @@ for _mod_name in ("openmmtorch", "openmm_torch"):
         continue
 
 
-# Order of species indices expected by ANI2x. (Subset typical for biomolecules.)
-ANI2X_SPECIES_ORDER = ["H", "C", "N", "O", "F", "S", "Cl"]
-_SYMBOL_TO_INDEX = {s: i for i, s in enumerate(ANI2X_SPECIES_ORDER)}
 _TRACED_CACHE: Dict[Tuple[str, int, str], Any] = {}
 
 
@@ -42,8 +40,9 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         self.register_buffer("species", species.long())
 
     def forward(self, positions_nm: torch.Tensor) -> torch.Tensor:
-        # positions_nm shape (N, 3) in nm (OpenMM convention)
-        pos_ang = positions_nm.unsqueeze(0) * 10.0  # (1, N, 3) Å
+        # positions_nm shape (N, 3) in nm (OpenMM convention). Cast to model dtype.
+        model_dtype = next(self.ani_model.parameters()).dtype  # type: ignore[stop-iteration]
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -56,20 +55,26 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         return energy_kjmol.sum()
 
 
-def _species_tensor(symbols: Sequence[str]) -> torch.Tensor:
-    try:
-        idxs = [_SYMBOL_TO_INDEX[s] for s in symbols]
-    except KeyError as missing:
-        raise ValueError(
-            f"Element '{missing.args[0]}' not supported by ANI2x helper. Supported: {ANI2X_SPECIES_ORDER}"  # noqa: E501
-        ) from None
-    return torch.tensor([idxs], dtype=torch.long)
+def _species_atomic_numbers(topology) -> torch.Tensor:
+    """Return (1, N) tensor of atomic numbers for the given topology.
+
+    TorchANI models (e.g., ANI2x/ANI2dr) expect atomic numbers, not a local
+    reindexed species mapping. Using atomic numbers avoids element order
+    assumptions and supports any subset the model was trained on.
+    """
+    nums = []
+    for atom in topology.atoms():
+        element = atom.element
+        if element is None or getattr(element, "atomic_number", None) is None:  # pragma: no cover
+            raise ValueError(f"Atom '{atom.name}' missing atomic number; cannot build species tensor")
+        nums.append(int(element.atomic_number))
+    return torch.tensor([nums], dtype=torch.long)
 
 
 def build_ani_torch_force(
     topology,
     model_name: str = "ANI2DR",
-    dtype: str = "float32",
+    dtype: str = "float64",  # default to double precision for maximum accuracy
     threads: int | None = None,
     cache: bool = True,
 ):
@@ -82,7 +87,7 @@ def build_ani_torch_force(
     model_name : str
         Name of ANI pretrained model (currently only 'ANI2x').
     dtype : str
-        'float32' (default) or 'float64'. Float32 is faster.
+        'float64' (default for numerical fidelity) or 'float32' (faster).
     threads : int | None
         If provided, sets torch.set_num_threads for this module build.
     """
@@ -98,22 +103,40 @@ def build_ani_torch_force(
         torch.set_num_threads(int(threads))
 
     ani_model = get_raw_ani_model(model_name)
-    if dtype == "float64":  # pragma: no cover
+    requested_dtype = dtype
+    if requested_dtype == "float64":  # pragma: no cover
         ani_model = ani_model.double()
     else:
         ani_model = ani_model.float()
 
-    symbols = [atom.element.symbol for atom in topology.atoms()]
-    species = _species_tensor(symbols)
+    species = _species_atomic_numbers(topology)
 
     module = ANIPotentialModule(ani_model, species)
-    key = (model_name.upper(), len(symbols), dtype)
+    n_atoms = species.shape[1]
+    key = (model_name.upper(), n_atoms, dtype)
     if cache and key in _TRACED_CACHE:
         traced = _TRACED_CACHE[key]
     else:
-        example = torch.zeros((len(symbols), 3), dtype=getattr(torch, dtype))
-        with torch.no_grad():  # tracing only
-            traced = torch.jit.trace(module, example)
+        example = torch.zeros((n_atoms, 3), dtype=getattr(torch, requested_dtype))
+        try:
+            with torch.no_grad():  # tracing only
+                traced = torch.jit.trace(module, example)
+        except RuntimeError as exc:  # fallback on dtype mismatch
+            msg = str(exc)
+            if "scalar type" in msg and requested_dtype == "float64":
+                logging.warning(
+                    "TorchScript trace failed in double precision; falling back to float32 for TorchForce (detail: %s)",
+                    msg.splitlines()[0],
+                )
+                # Rebuild model & module in float32
+                ani_model_fp32 = get_raw_ani_model(model_name).float()
+                module_fp32 = ANIPotentialModule(ani_model_fp32, species)
+                example_fp32 = torch.zeros((n_atoms, 3), dtype=torch.float32)
+                with torch.no_grad():
+                    traced = torch.jit.trace(module_fp32, example_fp32)
+                key = (model_name.upper(), n_atoms, "float32")
+            else:
+                raise
         if cache:
             _TRACED_CACHE[key] = traced
 

@@ -28,18 +28,18 @@ def _load_ani2x():  # pragma: no cover
 
 
 MODEL_LOADERS: Dict[str, Callable[[], torch.nn.Module]] = {
-    "ANI2dr": _load_ani2dr,
-    "ANI2x": _load_ani2x,
+    "ANI2DR": _load_ani2dr,
+    "ANI2X": _load_ani2x,
 }
 
-DEFAULT_MODEL = "ANI2dr"
+DEFAULT_MODEL = "ANI2DR"
 
 
 def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
-    key = model_name.upper()
+    key = model_name.strip().upper()
     if key not in MODEL_LOADERS:
         raise ValueError(
-            f"Unsupported ANI model '{model_name}'. Supported: {', '.join(MODEL_LOADERS)}"
+            f"Unsupported ANI model '{model_name}'. Supported: {', '.join(MODEL_LOADERS.keys())}"
         )
     return MODEL_LOADERS[key]()
 

@@ -17,12 +17,17 @@ warnings.filterwarnings(
     message=r"pkg_resources is deprecated as an API",
     category=UserWarning,
 )
+warnings.filterwarnings(
+    "ignore",
+    message=r"Warning: importing 'simtk.openmm' is deprecated",
+    category=UserWarning,
+)
 
 from .ani import (  # noqa: F401
     ani_energy_forces,
-    load_ani_model,
-    list_available_ani_models,
     get_raw_ani_model,
+    list_available_ani_models,
+    load_ani_model,
 )
 from .convert import smiles_to_ase  # noqa: F401
 from .openmm_runner import minimize_and_md  # noqa: F401
