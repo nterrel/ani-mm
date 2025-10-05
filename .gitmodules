@@ -1,0 +1,3 @@
+[submodule "external/torchani"]
+	path = external/torchani
+	url = https://github.com/aiqm/torchani

@@ -19,3 +19,5 @@ htmlcov/
 
 # Mac
 .DS_Store
+
+.ruff_cache/
