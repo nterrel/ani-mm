@@ -1,6 +1,6 @@
 """OpenMM integration helpers for adding an ANI potential via TorchForce.
 
-Requires the openmmtorch plugin (``conda install -c conda-forge openmmtorch``).
+Requires the openmm-torch plugin (``conda install -c conda-forge openmm-torch``).
 
 The helper builds a TorchScript module wrapping a TorchANI model so that
 OpenMM can obtain energies (and forces via autograd) each integration step.
@@ -13,7 +13,7 @@ from typing import Dict, Sequence, Tuple, Any
 import torch
 
 try:  # optional plugin
-    from openmmtorch import TorchForce  # type: ignore
+    from openmm_torch import TorchForce  # type: ignore
 except Exception as exc:  # pragma: no cover - module load guard
     TorchForce = None  # type: ignore
     _torchforce_import_error = exc
@@ -83,7 +83,7 @@ def build_ani_torch_force(
     """
     if TorchForce is None:  # pragma: no cover
         raise ImportError(
-            "openmmtorch not available. Install with: conda install -c conda-forge openmmtorch"
+            "openmm-torch not available. Install with: conda install -c conda-forge openmm-torch"
         ) from _torchforce_import_error
 
     from .ani import get_raw_ani_model

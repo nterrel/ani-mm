@@ -8,7 +8,7 @@ dependencies:
   - rdkit
   - pytorch  # conda-forge build (CPU or Metal acceleration on Apple Silicon)
   - torchani
-  - openmmtorch  # for TorchForce (ANI in OpenMM)
+  - openmm-torch  # for TorchForce (ANI in OpenMM)
   - pip
   - pip:
       - -e .[dev]
