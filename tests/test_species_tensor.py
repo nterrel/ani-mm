@@ -23,9 +23,12 @@ def test_species_tensor_uses_atomic_numbers():
 
     # Build force; this will trigger species tensor generation. We don't need full simulation.
     try:
-        _ = build_ani_torch_force(pdb.topology, model_name="ANI2DR", dtype="float64", cache=False)  # noqa: F841
+        _ = build_ani_torch_force(
+            pdb.topology, model_name="ANI2DR", dtype="float64", cache=False
+        )  # noqa: F841
     except ImportError:
-        pytest.skip("TorchForce / openmm-torch not available in this test environment")
+        pytest.skip(
+            "TorchForce / openmm-torch not available in this test environment")
 
     # Indirect validation: traced module stored in cache contains species buffer of atomic numbers.
     # Pull a traced module from internal cache if present.
@@ -36,7 +39,8 @@ def test_species_tensor_uses_atomic_numbers():
             # Extract species from the scripted module's original module (original attribute names kept)
             # TorchScript stores buffers as attributes.
             try:
-                species = traced.original_module.species  # type: ignore[attr-defined]
+                # type: ignore[attr-defined]
+                species = traced.original_module.species
             except AttributeError:
                 continue
             species_list = species.squeeze(0).tolist()
@@ -46,6 +50,7 @@ def test_species_tensor_uses_atomic_numbers():
             assert species_list.count(1) == 4
             break
     else:
-        pytest.skip("Traced module not cached; unable to inspect species tensor")
+        pytest.skip(
+            "Traced module not cached; unable to inspect species tensor")
 
     clear_traced_cache()

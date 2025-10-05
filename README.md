@@ -41,24 +41,24 @@ pip install -e .[dev,ml]
 
 If you need features or models newer than the packaged release:
 
+Use the `ml-git` extra for bleeding-edge (GitHub main) instead of the packaged release:
+
 ```bash
 pip install -e .[dev,ml-git]
 ```
 
-Alternatively, pin a specific commit for full reproducibility (replace `SHA`):
+Pin a specific commit for reproducibility (replace `SHA`):
 
 ```bash
 pip install "torchani @ git+https://github.com/aiqm/torchani.git@SHA"
 ```
 
-Or clone as a submodule for local patching:
+For local patching you can still clone manually:
 
 ```bash
 git submodule add https://github.com/aiqm/torchani external/torchani
 pip install -e external/torchani
 ```
-
-The repository ships a helper script `scripts/install_latest_torchani.sh` to automate a shallow clone.
 
 ```
 

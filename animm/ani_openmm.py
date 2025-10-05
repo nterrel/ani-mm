@@ -10,8 +10,8 @@ OpenMM can obtain energies (and forces via autograd) each integration step.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
 import logging
+from typing import Any, Dict, Tuple
 
 import torch
 
@@ -21,7 +21,8 @@ for _mod_name in ("openmmtorch", "openmm_torch"):
     if TorchForce is not None:
         break
     try:  # pragma: no cover - import guard
-        TorchForce = __import__(_mod_name, fromlist=["TorchForce"]).TorchForce  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        TorchForce = __import__(_mod_name, fromlist=["TorchForce"]).TorchForce
     except Exception as exc:  # store last error
         _torchforce_import_error = exc
         continue
@@ -41,8 +42,10 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
 
     def forward(self, positions_nm: torch.Tensor) -> torch.Tensor:
         # positions_nm shape (N, 3) in nm (OpenMM convention). Cast to model dtype.
-        model_dtype = next(self.ani_model.parameters()).dtype  # type: ignore[stop-iteration]
-        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
+        # type: ignore[stop-iteration]
+        model_dtype = next(self.ani_model.parameters()).dtype
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(
+            0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -66,7 +69,9 @@ def _species_atomic_numbers(topology) -> torch.Tensor:
     for atom in topology.atoms():
         element = atom.element
         if element is None or getattr(element, "atomic_number", None) is None:  # pragma: no cover
-            raise ValueError(f"Atom '{atom.name}' missing atomic number; cannot build species tensor")
+            raise ValueError(
+                f"Atom '{atom.name}' missing atomic number; cannot build species tensor"
+            )
         nums.append(int(element.atomic_number))
     return torch.tensor([nums], dtype=torch.long)
 
@@ -117,7 +122,8 @@ def build_ani_torch_force(
     if cache and key in _TRACED_CACHE:
         traced = _TRACED_CACHE[key]
     else:
-        example = torch.zeros((n_atoms, 3), dtype=getattr(torch, requested_dtype))
+        example = torch.zeros(
+            (n_atoms, 3), dtype=getattr(torch, requested_dtype))
         try:
             with torch.no_grad():  # tracing only
                 traced = torch.jit.trace(module, example)

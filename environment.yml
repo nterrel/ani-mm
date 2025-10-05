@@ -14,7 +14,7 @@ dependencies:
       - -e .[dev]
 
 # Notes:
-# 1. Keeping everything (OpenMM, PyTorch, TorchANI) from conda-forge reduces risk of multiple libomp runtimes.
+# 1. Keeping everything (OpenMM, PyTorch, TorchANI) from conda-forge reduces risk of multiple libomp runtimes. (NOTE: TorchANI from conda-forge is v2.1.0 as of 2024-06-10, newer versions may be available via GitHub source.)
 # 2. For CUDA-enabled Linux systems, you can instead install the official CUDA PyTorch wheels and then add torchani via pip;
 #    but ensure only one OpenMP runtime by avoiding mixing system Homebrew llvm-openmp with conda-forge packages.
 # 3. If you previously installed torch via pip in this env, remove the env entirely before recreating to clear old libomp copies.
