@@ -10,6 +10,8 @@ Mitigations:
 from __future__ import annotations
 
 import argparse
+import json
+import logging
 import os
 
 # Apply OpenMP thread limiting early if user requested
@@ -27,8 +29,15 @@ from .convert import smiles_to_ase
 
 
 def main(argv: list[str] | None = None):
-    parser = argparse.ArgumentParser(prog="ani-mm", description="ANI + OpenMM utilities")
+    parser = argparse.ArgumentParser(
+        prog="ani-mm", description="ANI + OpenMM utilities")
     sub = parser.add_subparsers(dest="cmd", required=True)
+
+    parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        help="Logging level (DEBUG, INFO, WARNING, ERROR)",
+    )
 
     parser.add_argument(
         "--allow-dup-omp",
@@ -43,14 +52,23 @@ def main(argv: list[str] | None = None):
         default="ANI2DR",
         help="ANI model name (default: ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
     )
+    p_eval.add_argument("--json", action="store_true",
+                        help="Emit JSON instead of text")
 
-    p_ala2 = sub.add_parser("ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
-    p_ala2.add_argument("--steps", type=int, default=2000, help="Number of MD steps (default 2000)")
-    p_ala2.add_argument("--t", type=float, default=300.0, help="Temperature in K (default 300)")
-    p_ala2.add_argument("--dt", type=float, default=2.0, help="Timestep in fs (default 2.0)")
-    p_ala2.add_argument("--report", type=int, default=200, help="Report interval (steps)")
-    p_ala2.add_argument("--dcd", default=None, help="Optional DCD trajectory output path")
-    p_ala2.add_argument("--platform", default=None, help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_ala2 = sub.add_parser(
+        "ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
+    p_ala2.add_argument("--steps", type=int, default=2000,
+                        help="Number of MD steps (default 2000)")
+    p_ala2.add_argument("--t", type=float, default=300.0,
+                        help="Temperature in K (default 300)")
+    p_ala2.add_argument("--dt", type=float, default=2.0,
+                        help="Timestep in fs (default 2.0)")
+    p_ala2.add_argument("--report", type=int, default=200,
+                        help="Report interval (steps)")
+    p_ala2.add_argument("--dcd", default=None,
+                        help="Optional DCD trajectory output path")
+    p_ala2.add_argument("--platform", default=None,
+                        help="OpenMM platform name (e.g. CUDA, CPU)")
     p_ala2.add_argument(
         "--force-mode",
         default="amber",
@@ -65,6 +83,15 @@ def main(argv: list[str] | None = None):
     p_ala2.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
+    p_ala2.add_argument("--seed", type=int, default=None,
+                        help="Random seed for integrator RNG")
+    p_ala2.add_argument("--no-min", action="store_true",
+                        help="Skip energy minimization")
+    p_ala2.add_argument("--json", action="store_true",
+                        help="Emit JSON instead of text")
+
+    p_models = sub.add_parser("models", help="List available ANI models")
+    p_models.add_argument("--json", action="store_true", help="Emit JSON list")
 
     args = parser.parse_args(argv)
 
@@ -72,8 +99,21 @@ def main(argv: list[str] | None = None):
     if args.allow_dup_omp:  # pragma: no cover - environment specific
         os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
+    logging.basicConfig(level=getattr(
+        logging, args.log_level.upper(), logging.WARNING))
+
     # Lazy import heavy torch/openmm dependent modules after env tweaks
-    from .ani import ani_energy_forces, load_ani_model  # noqa: WPS433
+    from .ani import ani_energy_forces, load_ani_model, list_available_ani_models  # noqa: WPS433
+
+    if args.cmd == "models":
+        models = list_available_ani_models()
+        if getattr(args, "json", False):
+            print(json.dumps(models))
+        else:
+            print("Available ANI models:")
+            for m in models:
+                print(" -", m)
+        return 0
 
     if args.cmd == "eval":
         atoms = smiles_to_ase(args.smiles)
@@ -81,7 +121,22 @@ def main(argv: list[str] | None = None):
         eval_res = ani_energy_forces(model, atoms)
         hartree_to_kcalmol = 627.509474
         energy_kcal = eval_res.energy.item() * hartree_to_kcalmol
-        print(f"Energy: {energy_kcal:.4f} kcal/mol ({eval_res.energy.item():.6f} Ha)")
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "smiles": args.smiles,
+                        "model": args.model,
+                        "energy_hartree": eval_res.energy.item(),
+                        "energy_kcal_mol": energy_kcal,
+                        "natoms": len(atoms),
+                    }
+                )
+            )
+        else:
+            print(
+                f"SMILES={args.smiles} model={args.model} energy={energy_kcal:.4f} kcal/mol ({eval_res.energy.item():.6f} Ha)"
+            )
         return 0
 
     if args.cmd == "ala2-md":
@@ -97,10 +152,15 @@ def main(argv: list[str] | None = None):
             force_mode=args.force_mode,
             ani_model=args.ani_model,
             ani_threads=args.ani_threads,
+            seed=args.seed,
+            minimize=not args.no_min,
         )
-        print(f"Finished: {sim_info['steps']} steps,")
-        print(f" mode={sim_info['force_mode']},")
-        print(f" final potential {sim_info['final_potential_kjmol']:.2f} kJ/mol")
+        if args.json:
+            print(json.dumps(sim_info))
+        else:
+            print(
+                f"Finished steps={sim_info['steps']} mode={sim_info['force_mode']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol"
+            )
         return 0
 
     parser.print_help()

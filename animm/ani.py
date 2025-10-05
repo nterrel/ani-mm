@@ -7,7 +7,7 @@ Supported model names (case-insensitive):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 import torch
 import torchani
@@ -27,19 +27,12 @@ def _load_ani2x():  # pragma: no cover
     return torchani.models.ANI2x()
 
 
-def _load_ani2xperiodic():  # pragma: no cover
-    if not hasattr(torchani.models, "ANI2xPeriodic"):
-        raise ValueError("ANI2xPeriodic not available in this torchani build")
-    return torchani.models.ANI2xPeriodic()
-
-
 MODEL_LOADERS: Dict[str, Callable[[], torch.nn.Module]] = {
-    "ANI2DR": _load_ani2dr,
-    "ANI2X": _load_ani2x,
-    "ANI2XPERIODIC": _load_ani2xperiodic,
+    "ANI2dr": _load_ani2dr,
+    "ANI2x": _load_ani2x,
 }
 
-DEFAULT_MODEL = "ANI2DR"
+DEFAULT_MODEL = "ANI2dr"
 
 
 def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
@@ -55,6 +48,18 @@ def load_ani_model(model_name: str = DEFAULT_MODEL):
     return get_raw_ani_model(model_name).ase()
 
 
+def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
+    available: List[str] = []
+    for name in MODEL_LOADERS:
+        try:
+            MODEL_LOADERS[name]()
+        except Exception:
+            continue
+        else:
+            available.append(name)
+    return available
+
+
 def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
     """Compute energy and forces using ANI for an ASE Atoms object.
 
@@ -68,3 +73,12 @@ def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
         energy=torch.tensor([energy], dtype=torch.float64),
         forces=torch.tensor(forces, dtype=torch.float64),
     )
+
+
+__all__ = [
+    "ANIEvaluation",
+    "load_ani_model",
+    "get_raw_ani_model",
+    "list_available_ani_models",
+    "ani_energy_forces",
+]

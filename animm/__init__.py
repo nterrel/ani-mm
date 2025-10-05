@@ -18,6 +18,22 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-from .ani import ani_energy_forces, load_ani_model  # noqa: F401
+from .ani import (  # noqa: F401
+    ani_energy_forces,
+    load_ani_model,
+    list_available_ani_models,
+    get_raw_ani_model,
+)
 from .convert import smiles_to_ase  # noqa: F401
 from .openmm_runner import minimize_and_md  # noqa: F401
+from .version import __version__  # noqa: F401
+
+__all__ = [
+    "ani_energy_forces",
+    "load_ani_model",
+    "list_available_ani_models",
+    "get_raw_ani_model",
+    "smiles_to_ase",
+    "minimize_and_md",
+    "__version__",
+]
