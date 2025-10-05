@@ -108,9 +108,9 @@ res = run_ani_md(atoms, n_steps=500, live_view=True, live_interval=50)
 
 Backends:
 
-* auto – prefer ASE GUI if available, then Matplotlib.
-* ase – force ASE GUI.
-* mpl – force Matplotlib scatter.
+- auto – prefer ASE GUI if available, then Matplotlib.
+- ase – force ASE GUI.
+- mpl – force Matplotlib scatter.
 
 Headless (no display) -> viewer auto‑disables.
 

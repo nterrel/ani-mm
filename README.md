@@ -170,18 +170,6 @@ Filters a few recurring lines (legacy `simtk.openmm` deprecation, experimental m
 | ⏳ | Restart / checkpoint |
 | ⏳ | More examples |
 
-## Tests
-
-```bash
-pytest -q
-```
-
-Coverage:
-
-```bash
-pytest --cov=animm --cov-report=term-missing
-```
-
 ## Dev loop
 
 ```bash
@@ -191,10 +179,6 @@ isort --check-only .
 pytest -q
 mkdocs serve
 ```
-
-## Contributing
-
-Small, focused PRs welcome. Include/update tests if you change behavior; minimize unrelated formatting churn.
 
 ## License
 
@@ -213,21 +197,21 @@ Windows hasn’t been tried yet.
 
 ## What this project actually does
 
-- Turn a SMILES string into an ASE `Atoms` (RDKit when available, a tiny fallback otherwise).
-- Load a pretrained TorchANI model by name (currently `ANI2DR`, `ANI2X`).
-- Ask for a single‑point energy and forces (double precision first; drop to float32 only if tracing forces us to).
-- Build a single OpenMM `TorchForce` around that model so every MD step gets neural network forces.
-- Provide a “just run it” alanine dipeptide vacuum simulation (OpenMM first, ASE if the plugin isn’t there).
-- Offer a generic `run_ani_md` function with optional in‑memory coordinates or a DCD on disk.
-- (New) Optional lightweight live viewer window (ASE GUI or Matplotlib) if you want to watch atoms drift while it runs.
+* Turn a SMILES string into an ASE `Atoms` (RDKit when available, a tiny fallback otherwise).
+* Load a pretrained TorchANI model by name (currently `ANI2DR`, `ANI2X`).
+* Ask for a single‑point energy and forces (double precision first; drop to float32 only if tracing forces us to).
+* Build a single OpenMM `TorchForce` around that model so every MD step gets neural network forces.
+* Provide a “just run it” alanine dipeptide vacuum simulation (OpenMM first, ASE if the plugin isn’t there).
+* Offer a generic `run_ani_md` function with optional in‑memory coordinates or a DCD on disk.
+* (New) Optional lightweight live viewer window (ASE GUI or Matplotlib) if you want to watch atoms drift while it runs.
 
 ## Things not done yet (but on the radar)
 
-- Periodic boundary / cutoff aware variants (waiting on appropriate model + a clean interface).
-- Mixed precision exploration (make it a toggle instead of secret fallback).
-- A richer pile of reporters (CSV / JSON logs, progress bars, checkpointing).
-- Restart support.
-- Additional small examples beyond alanine.
+* Periodic boundary / cutoff aware variants (waiting on appropriate model + a clean interface).
+* Mixed precision exploration (make it a toggle instead of secret fallback).
+* A richer pile of reporters (CSV / JSON logs, progress bars, checkpointing).
+* Restart support.
+* Additional small examples beyond alanine.
 
 ## Install (development path)
 
@@ -325,18 +309,18 @@ plugin is missing.
 
 Current limitations:
 
-- Vacuum only (no periodic boundary conditions yet).
-- No restart / checkpoint.
-- Alanine example writes a CSV‑ish line per report straight to stdout for now.
-- Mixed precision is a future knob; the trace dtype sits on the force object as `_animm_traced_dtype` today.
+* Vacuum only (no periodic boundary conditions yet).
+* No restart / checkpoint.
+* Alanine example writes a CSV‑ish line per report straight to stdout for now.
+* Mixed precision is a future knob; the trace dtype sits on the force object as `_animm_traced_dtype` today.
 
 ### About the warning noise you *don’t* see
 
 The package suppresses a few known noisy warnings (via `warnings.filterwarnings` and selective stderr redirection during critical imports):
 
-- Deprecated `simtk.openmm` import notices (emitted by third-party legacy compatibility imports).
-- Experimental TorchANI model (ANI-2xr) user warning.
-- `pkg_resources` deprecation warning triggered during TorchANI import.
+* Deprecated `simtk.openmm` import notices (emitted by third-party legacy compatibility imports).
+* Experimental TorchANI model (ANI-2xr) user warning.
+* `pkg_resources` deprecation warning triggered during TorchANI import.
 
 If you want everything back, run with `PYTHONWARNINGS=default` or delete those
 filters locally.
@@ -357,18 +341,18 @@ to manually flush the cache.
 
 ## Roadmap snapshot
 
-- [x] Basic ANI energy/force evaluation wrapper
-- [x] ASE <-> OpenMM conversion helpers
-- [x] OpenMM TorchForce integration (ANI-only)
-- [x] Alanine dipeptide vacuum MD example
-- [x] Warning suppression & model name normalization
-- [x] Double precision default + float32 fallback
-- [x] Generic MD runner (`run_ani_md`) with optional in-memory trajectory
-- [ ] Rich reporter & logging framework (CSV/JSON, progress bars)
-- [ ] Periodic system support (when suitable models available)
-- [ ] Mixed precision / performance tuning knobs
-- [ ] CI matrix for (CPU / GPU) and float32/float64 tracing
-- [ ] Checkpoint / restart support
+* [x] Basic ANI energy/force evaluation wrapper
+* [x] ASE <-> OpenMM conversion helpers
+* [x] OpenMM TorchForce integration (ANI-only)
+* [x] Alanine dipeptide vacuum MD example
+* [x] Warning suppression & model name normalization
+* [x] Double precision default + float32 fallback
+* [x] Generic MD runner (`run_ani_md`) with optional in-memory trajectory
+* [ ] Rich reporter & logging framework (CSV/JSON, progress bars)
+* [ ] Periodic system support (when suitable models available)
+* [ ] Mixed precision / performance tuning knobs
+* [ ] CI matrix for (CPU / GPU) and float32/float64 tracing
+* [ ] Checkpoint / restart support
 
 ## Tests
 
@@ -389,10 +373,6 @@ Coverage report:
 ```bash
 pytest --cov=animm --cov-report=term-missing
 ```
-
-## License
-
-MIT
 
 ## Contributing
 
