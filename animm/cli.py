@@ -1,8 +1,11 @@
 """Command‑line interface.
 
-Handy environment knobs:
-* ``ANIMM_NO_OMP=1`` – force single threading for common BLAS/OpenMP libs.
-* ``--allow-dup-omp`` – sets ``KMP_DUPLICATE_LIB_OK=TRUE`` (only if you really need to sidestep a macOS libomp clash).
+Environment knobs:
+* ``ANIMM_NO_OMP=1`` – force single threading (BLAS / OpenMP libs).
+* ``--allow-dup-omp`` – add ``KMP_DUPLICATE_LIB_OK=TRUE`` (macOS workaround).
+
+Use ``--debug`` for provenance (trace dtype, cache hits). Noisy third‑party
+debug logs are down‑leveled so ``animm.*`` messages stand out.
 """
 
 from __future__ import annotations
@@ -140,7 +143,8 @@ def main(argv: list[str] | None = None):
 
     effective_level = "DEBUG" if args.debug else args.log_level.upper()
     logging.basicConfig(
-        level=getattr(logging, effective_level, logging.DEBUG if args.debug else logging.WARNING)
+        level=getattr(logging, effective_level,
+                      logging.DEBUG if args.debug else logging.WARNING)
     )
     if args.debug:
         # Reduce noise from third-party debug spew so our provenance stands out

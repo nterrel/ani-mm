@@ -1,8 +1,7 @@
-"""Tiny alanine dipeptide (gas phase) demo.
+"""Gas‑phase alanine dipeptide demo (OpenMM + ANI, ASE fallback).
 
-Tries OpenMM + TorchForce first; if that path isn’t available it falls back to
-a bare‑bones ASE velocity Verlet loop. Intended for a quick sanity check, not
-benchmarking or production use.
+Primary path: OpenMM + ``TorchForce``. Fallback: minimal ASE velocity Verlet.
+Intended for quick smoke tests, not benchmarking.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ def simulate_alanine_dipeptide(
     live_backend: str = "auto",
     hold_open: bool = False,
 ) -> Dict[str, Any]:
-    """Run a short gas‐phase alanine dipeptide simulation.
+    """Run a short alanine dipeptide (vacuum) simulation.
 
     Parameters
     ----------
@@ -76,8 +75,8 @@ def simulate_alanine_dipeptide(
 
     Returns
     -------
-    Dictionary containing simulation metadata and energies. Per‑step progress
-    is printed to stdout (unless redirected) via a lightweight reporter.
+    dict
+        Simulation metadata and energies.
     """
     log = logging.getLogger("animm.ala2")
     if openmm is None or app is None or unit is None:  # pragma: no cover

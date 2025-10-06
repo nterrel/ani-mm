@@ -1,12 +1,11 @@
-"""Small helper layer around TorchANI.
+"""Minimal TorchANI convenience helpers.
 
-What this does (and no more):
-* Load a named ANI model (case‑insensitive).
-* Hand you an ASE calculator wrapper.
+Capabilities:
+* Load a named pretrained ANI model (``ANI2DR`` default, also ``ANI2X``).
+* Obtain an ASE calculator via ``.ase()``.
 * Compute a single‑point energy + forces (Hartree, Hartree/Bohr).
 
-Supported today: ``ANI2DR`` (default) and ``ANI2X``. To experiment with more,
-extend ``MODEL_LOADERS`` in your own code or a PR.
+Extend :data:`MODEL_LOADERS` to experiment with additional models.
 """
 
 from __future__ import annotations
@@ -46,7 +45,12 @@ def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
     Parameters
     ----------
     model_name : str
-        Model identifier (case‑insensitive). Raises ``ValueError`` if unknown.
+        Case‑insensitive model identifier.
+
+    Raises
+    ------
+    ValueError
+        If the model name is unsupported.
     """
     key = model_name.strip().upper()
     if key not in MODEL_LOADERS:
@@ -57,7 +61,7 @@ def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
 
 
 def load_ani_model(model_name: str = DEFAULT_MODEL):
-    # TorchANI model exposes .ase() to build an ASE-compatible wrapper
+    """Return an ASE‑compatible calculator wrapper for the given model."""
     return get_raw_ani_model(model_name).ase()  # type: ignore[attr-defined]
 
 
@@ -75,12 +79,19 @@ def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
 
 
 def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
-    """Compute energy and forces for an ASE ``Atoms`` using a TorchANI ASE model.
+    """Compute a single‑point energy and forces.
+
+    Parameters
+    ----------
+    ani_model : Any
+        TorchANI ASE model wrapper (from :func:`load_ani_model`).
+    ase_atoms : ase.Atoms
+        Structure to evaluate.
 
     Returns
     -------
     ANIEvaluation
-        Energy (Hartree) and forces (Hartree/Bohr) as float64 tensors.
+        Energy (Hartree, shape ``(1,)``) and forces (Hartree/Bohr, shape ``(N,3)``).
     """
     # TorchANI ASE wrapper exposes both get_potential_energy(atoms) and get_forces(atoms)
     # returning energy in Hartree and forces in Hartree/Bohr.

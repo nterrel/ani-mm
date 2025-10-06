@@ -1,11 +1,7 @@
-"""Lightweight OpenMM MD loop for ANI potentials.
+"""Lightweight OpenMM Langevin MD loop with ANI forces.
 
-Focus: minimal setup, predictable defaults, optional trajectory capture.
-Builds a system with a single ANI ``TorchForce`` and runs Langevin dynamics.
-Collect positions in memory or write a DCD if you ask. Returns a small result
-object with final energy, temperature estimate, and (optionally) coordinates.
-
-``minimize_and_md`` sticks around only for older callers; prefer ``run_ani_md``.
+Single responsibility: build a system (one ``TorchForce``) and integrate.
+Optional: trajectory capture, DCD output, live viewer integration.
 """
 
 from __future__ import annotations
@@ -36,7 +32,7 @@ from .ani_openmm import build_ani_torch_force
 
 @dataclass
 class MDState:
-    """Very small legacy container with initial/final snapshot (compat only)."""
+    """Legacy two‑frame (initial/final) container."""
 
     positions: np.ndarray  # (T, N, 3)
     velocities: np.ndarray  # (T, N, 3)
@@ -45,31 +41,7 @@ class MDState:
 
 @dataclass
 class MDResult:
-    """Structured result returned by ``run_ani_md``.
-
-    Attributes
-    ----------
-    final_potential_kjmol: float
-        Final potential energy (kJ/mol).
-    final_temperature_K: float | None
-        Final instantaneous temperature estimate (Kelvin) or None if unavailable.
-    steps: int
-        Number of integration steps performed.
-    model: str
-        ANI model name used.
-    dtype: str
-        Precision of traced Torch module ('float64' or 'float32').
-    engine: str
-        Execution engine identifier (always 'openmm-torch' here on success).
-    positions: np.ndarray | None
-        Trajectory positions (frames, N, 3) in Å if collected, else None.
-    times_ps: np.ndarray | None
-        Simulation times corresponding to frames (ps) if collected.
-    dcd_path: str | None
-        Path to written DCD (if any).
-    reporter_outputs: List[str]
-        Any textual reporter output captured (for future extension).
-    """
+    """Result bundle (energies in kJ/mol, times ps, positions Å)."""
 
     final_potential_kjmol: float
     final_temperature_K: Optional[float]
@@ -179,12 +151,12 @@ def run_ani_md(
     live_interval: int | None = None,
     hold_open: bool = False,
 ) -> MDResult:
-    """Run Langevin MD for an ASE ``Atoms`` object with an ANI potential.
+    """Run Langevin MD with ANI forces.
 
     Parameters
     ----------
     ase_atoms : Atoms
-        Input coordinates (Å) and atomic species.
+        Input coordinates (Å) and species.
     model : str
         ANI model name (case-insensitive, e.g. ANI2DR, ANI2X).
     n_steps : int
@@ -219,8 +191,7 @@ def run_ani_md(
         Interval for live view updates. Defaults to ``report_interval`` if
         not provided.
     hold_open : bool
-        If True and using the matplotlib viewer, keep window open (blocking)
-        at the end of the simulation until user closes it.
+        Keep Matplotlib viewer window open after completion.
     """
     log = logging.getLogger("animm.md")
     if openmm is None or app is None or unit is None:

@@ -1,12 +1,11 @@
-"""Glue for building an OpenMM ``TorchForce`` from a TorchANI model.
+"""Build an OpenMM ``TorchForce`` from a TorchANI model.
 
-We trace the selected ANI network with TorchScript once (per model / atom count /
-dtype) and reuse that graph inside OpenMM so forces are evaluated each step.
-
-Quick facts:
-* Needs the ``openmm-torch`` plugin (we try both import spellings).
-* Prefers a float64 trace; retries in float32 only if necessary.
-* Caches traces keyed by (MODEL, NATOMS, DTYPE) in‑process.
+Summary:
+* Trace once per ``(MODEL, NATOMS, DTYPE)`` and cache in‑process.
+* Prefer ``float64`` trace; retry automatically in ``float32`` if needed.
+* Attach provenance metadata on the returned force:
+    * ``_animm_traced_dtype``
+    * ``_animm_cache_hit`` (bool)
 """
 
 from __future__ import annotations
@@ -41,12 +40,10 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         # species: shape (1, N)
         self.register_buffer("species", species.long())
 
-    def forward(self, positions_nm: torch.Tensor) -> torch.Tensor:
-        # positions_nm shape (N, 3) in nm (OpenMM convention). Cast to model dtype.
-        # type: ignore[stop-iteration]
-        model_dtype = next(self.ani_model.parameters()).dtype
-        pos_ang = positions_nm.to(model_dtype).unsqueeze(
-            0) * 10.0  # (1, N, 3) Å
+    def forward(self, positions_nm: torch.Tensor) -> torch.Tensor:  # noqa: D401
+        # positions_nm: (N,3) nm -> cast, expand, convert to Å, evaluate.
+        model_dtype = next(self.ani_model.parameters()).dtype  # type: ignore[stop-iteration]
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -84,20 +81,25 @@ def build_ani_torch_force(
     threads: int | None = None,
     cache: bool = True,
 ):
-    """Return a ``TorchForce`` for an ANI model & topology.
+    """Return a configured ``TorchForce``.
 
     Parameters
     ----------
     topology : openmm.app.Topology
-        Topology whose atom ordering must match the target ``Simulation``.
+        Must match intended simulation atom ordering.
     model_name : str
-        ANI model name (e.g. ``ANI2DR`` or ``ANI2X``).
+        ANI model name (e.g. ``ANI2DR``).
     dtype : str
-        Requested tracing precision (``float64`` default; falls back to ``float32``).
+        Requested trace precision (``float64`` preferred).
     threads : int | None
-        Optional override for ``torch.set_num_threads`` during trace.
+        Optional torch intraop thread override during trace.
     cache : bool
-        If True (default) reuse/store a traced module in the in‑process cache.
+        Enable in‑process traced module cache.
+
+    Returns
+    -------
+    TorchForce
+        With provenance attributes ``_animm_traced_dtype`` & ``_animm_cache_hit``.
     """
     if TorchForce is None:  # pragma: no cover
         raise ImportError(
