@@ -37,8 +37,7 @@ def test_eval_smiles(capsys):
 
 @pytest.mark.skipif("openmm" not in sys.modules, reason="OpenMM not imported yet")
 def test_ala2_md_json(capsys):
-    rc = run_cli(["ala2-md", "--steps", "5", "--json",
-                 "--report", "5"])  # tiny run
+    rc = run_cli(["ala2-md", "--steps", "5", "--json", "--report", "5"])  # tiny run
     assert rc == 0
     out = capsys.readouterr().out.strip()
     data = json.loads(out)

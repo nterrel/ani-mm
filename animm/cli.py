@@ -54,8 +54,7 @@ if os.environ.get("ANIMM_NO_OMP") == "1":  # pragma: no cover - environment spec
 
 
 def main(argv: list[str] | None = None):
-    parser = argparse.ArgumentParser(
-        prog="ani-mm", description="ANI + OpenMM utilities")
+    parser = argparse.ArgumentParser(prog="ani-mm", description="ANI + OpenMM utilities")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     parser.add_argument(
@@ -83,24 +82,17 @@ def main(argv: list[str] | None = None):
         default="ANI2DR",
         help="ANI model name (default: ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
     )
-    p_eval.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_eval.add_argument("--json", action="store_true", help="Emit JSON instead of text")
 
-    p_ala2 = sub.add_parser(
-        "ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
-    p_ala2.add_argument("--steps", type=int, default=2000,
-                        help="Number of MD steps (default 2000)")
-    p_ala2.add_argument("--t", type=float, default=300.0,
-                        help="Temperature in K (default 300)")
-    p_ala2.add_argument("--dt", type=float, default=2.0,
-                        help="Timestep in fs (default 2.0)")
+    p_ala2 = sub.add_parser("ala2-md", help="Run a short alanine dipeptide vacuum MD simulation")
+    p_ala2.add_argument("--steps", type=int, default=2000, help="Number of MD steps (default 2000)")
+    p_ala2.add_argument("--t", type=float, default=300.0, help="Temperature in K (default 300)")
+    p_ala2.add_argument("--dt", type=float, default=2.0, help="Timestep in fs (default 2.0)")
     p_ala2.add_argument(
         "--report", type=int, default=50, help="Report interval (steps, default 50)"
     )
-    p_ala2.add_argument("--dcd", default=None,
-                        help="Optional DCD trajectory output path")
-    p_ala2.add_argument("--platform", default=None,
-                        help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_ala2.add_argument("--dcd", default=None, help="Optional DCD trajectory output path")
+    p_ala2.add_argument("--platform", default=None, help="OpenMM platform name (e.g. CUDA, CPU)")
     p_ala2.add_argument(
         "--ani-model",
         default="ANI2DR",
@@ -109,12 +101,9 @@ def main(argv: list[str] | None = None):
     p_ala2.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
-    p_ala2.add_argument("--seed", type=int, default=None,
-                        help="Random seed for integrator RNG")
-    p_ala2.add_argument("--no-min", action="store_true",
-                        help="Skip energy minimization")
-    p_ala2.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_ala2.add_argument("--seed", type=int, default=None, help="Random seed for integrator RNG")
+    p_ala2.add_argument("--no-min", action="store_true", help="Skip energy minimization")
+    p_ala2.add_argument("--json", action="store_true", help="Emit JSON instead of text")
     p_ala2.add_argument(
         "--live-view",
         action="store_true",
@@ -143,8 +132,7 @@ def main(argv: list[str] | None = None):
 
     effective_level = "DEBUG" if args.debug else args.log_level.upper()
     logging.basicConfig(
-        level=getattr(logging, effective_level,
-                      logging.DEBUG if args.debug else logging.WARNING)
+        level=getattr(logging, effective_level, logging.DEBUG if args.debug else logging.WARNING)
     )
     if args.debug:
         # Reduce noise from third-party debug spew so our provenance stands out
@@ -180,8 +168,11 @@ def main(argv: list[str] | None = None):
         hartree_to_kcalmol = 627.509474
         energy_kcal = eval_res.energy.item() * hartree_to_kcalmol
         log.debug(
-            "Eval SMILES=%s model=%s natoms=%d energy(Ha)=%.6f", args.smiles, args.model, len(
-                atoms), eval_res.energy.item()
+            "Eval SMILES=%s model=%s natoms=%d energy(Ha)=%.6f",
+            args.smiles,
+            args.model,
+            len(atoms),
+            eval_res.energy.item(),
         )
         if args.json:
             print(
@@ -241,8 +232,7 @@ def main(argv: list[str] | None = None):
             )
             extra = ""
             if "initial_potential_kjmol" in sim_info:
-                delta = sim_info["final_potential_kjmol"] - \
-                    sim_info["initial_potential_kjmol"]
+                delta = sim_info["final_potential_kjmol"] - sim_info["initial_potential_kjmol"]
                 extra = f" initial_potential={sim_info['initial_potential_kjmol']:.2f} delta={delta:.2f}"
             print(
                 f"Finished steps={sim_info['steps']} model={sim_info['model']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol{extra}"
@@ -262,8 +252,10 @@ def main(argv: list[str] | None = None):
                 print(summary)
         log.debug(
             "Alanine MD done steps=%s model=%s final=%.3f engine=%s",
-            sim_info.get('steps'), sim_info.get('model'), sim_info.get(
-                'final_potential_kjmol'), sim_info.get('engine')
+            sim_info.get("steps"),
+            sim_info.get("model"),
+            sim_info.get("final_potential_kjmol"),
+            sim_info.get("engine"),
         )
         return 0
 
