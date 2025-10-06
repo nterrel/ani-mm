@@ -1,60 +1,49 @@
 # ani-mm
 
-Utilities for running ANI neural network potentials with OpenMM (TorchForce) plus small helpers for model evaluation, SMILES conversion, and a minimal MD workflow.
+Lean helpers for embedding TorchANI ANI models (`ANI2DR`, `ANI2X`) into OpenMM via `TorchForce`, with SMILES conversion, single‑point evaluation, a minimal MD runner, and an optional live viewer.
 
 ## Highlights
 
-* Lean scope: ANI models only (currently `ANI2DR`, `ANI2X`).
-* TorchScript tracing cache (float64 preferred, automatic float32 fallback).
-* Lightweight MD runner (+ optional in‑memory trajectory, DCD output).
-* Alanine dipeptide vacuum example with delta energy reporter.
-* Experimental live viewer (ASE GUI or Matplotlib) with `--live-hold`.
+* Float64‑first TorchScript tracing (float32 fallback) with cache
+* Provenance metadata (`_animm_traced_dtype`, `_animm_cache_hit` + SUMMARY line)
+* Alanine dipeptide vacuum example (`ala2-md`)
+* Live viewer (ASE GUI → Matplotlib)
 
-## Install
-
-```bash
-pip install .
-# or with docs extras
-pip install .[docs]
-```
-
-From source with an editable install:
+## Install (dev/source)
 
 ```bash
+git clone --recurse-submodules https://github.com/nterrel/ani-mm.git
+cd ani-mm
+conda env create -f environment.yml
+conda activate ani-mm
 pip install -e .[docs]
 ```
 
-## Quick Start
-
-Evaluate ANI energy and forces for a simple SMILES string:
+## Quick CLI
 
 ```bash
-python -m animm.cli eval --smiles "CCO"
+ani-mm models
+ani-mm eval CCO --model ANI2X --json
+ani-mm ala2-md --steps 300 --report 50 --debug
 ```
 
-Run a short alanine dipeptide MD example with JSON output:
-
-```bash
-python -m animm.cli ala2-md --nsteps 200 --json
-```
-
-Programmatic usage:
+## Python Snippet
 
 ```python
-from animm.ani import load_model
 from animm.convert import smiles_to_ase
+from animm.ani import load_ani_model, ani_energy_forces
 
 atoms = smiles_to_ase("CCO")
-model = load_model("ani2x")
-energy, forces = model.energy_forces(atoms)
-print(energy.item(), forces.shape)
+calc = load_ani_model("ANI2DR")
+ev = ani_energy_forces(calc, atoms)
+print(ev.energy.item(), ev.forces.shape)
 ```
 
-## Documentation Map
+## Where Next
 
-* User Guide – practical CLI & programmatic recipes.
-* Live Viewer – backend selection, troubleshooting, hold flag.
-* API Reference – auto-generated public API.
-* Development – contributor workflow.
+* User Guide: detailed recipes & provenance
+* Live Viewer: backend details & caveats
+* Development: roadmap & contribution guide
+* API Reference: function docs (mkdocstrings)
 
-Roadmap and caveats live in the top-level README.
+For a very brief overview see the top-level README. Advanced install notes, roadmap, and provenance internals live here in the docs.

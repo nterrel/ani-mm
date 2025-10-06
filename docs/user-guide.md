@@ -1,127 +1,157 @@
 # User Guide
 
-Common tasks with `ani-mm`.
+Practical recipes for `ani-mm`.
 
-## 1. Listing Available Models
-
-```bash
-python -m animm.cli models
-```
-
-## 2. Evaluating Energy / Forces
-
-You can pass either a SMILES string or a path to a structure file supported by ASE (e.g. PDB, XYZ):
+## 1. List Available Models
 
 ```bash
-python -m animm.cli eval --smiles "CCO" --model ani2x
+ani-mm models
 ```
 
-To include forces in the JSON output:
-
-```bash
-python -m animm.cli eval --smiles "CCO" --model ani2x --json
-```
-
-Programmatic form:
+Programmatic:
 
 ```python
-from animm.ani import load_model
-from animm.convert import smiles_to_ase
-
-atoms = smiles_to_ase("CCO")
-model = load_model("ani2x")
-energy, forces = model.energy_forces(atoms)
+from animm.ani import list_available_ani_models
+print(list_available_ani_models())
 ```
 
-## 3. Running a Short MD Simulation
+## 2. Single‑Point Energy & Forces
 
-The `ala2-md` subcommand runs an implicit environment alanine dipeptide simulation using OpenMM+TorchForce:
+CLI (SMILES):
 
 ```bash
-python -m animm.cli ala2-md --nsteps 200 --platform CUDA --json
+ani-mm eval CCO --model ANI2X --json
 ```
 
-Key parameters:
-
-- `--nsteps`: number of integration steps.
-- `--timestep`: integration timestep (fs).
-- `--platform`: OpenMM platform (CUDA, OpenCL, CPU, etc.).
-- `--temperature`: thermostat target (K).
-
-## 4. Species Tensor Internals
-
-Internally, atomic numbers are mapped directly to TorchANI species indices. This removes dependence on global ordering and keeps the interface stable.
-
-## 5. TorchScript Tracing Cache
-
-Models are traced the first time they are used with a specific (model name, number of atoms, dtype) triple. If float64 tracing fails, the code retries with float32 and records the effective dtype in `_animm_traced_dtype` for provenance.
-
-## 6. Reusing the MD Runner Programmatically
-
-```python
-from animm.openmm_runner import run_ani_md
-from animm.alanine_dipeptide import load_alanine_dipeptide
-
-pdb, system = load_alanine_dipeptide(model_name="ani2x")
-result = run_ani_md(system, pdb.topology, pdb.positions, n_steps=500)
-print(result.n_steps, result.traced_dtype)
-```
-
-## 7. Converting SMILES to ASE Atoms
+Python:
 
 ```python
 from animm.convert import smiles_to_ase
+from animm.ani import load_ani_model, ani_energy_forces
+
 atoms = smiles_to_ase("CCO")
+calc = load_ani_model("ANI2DR")
+ev = ani_energy_forces(calc, atoms)
+print(ev.energy.item(), ev.forces.shape)
 ```
 
-RDKit is preferred when installed; a fallback builder is used otherwise.
+## 3. Alanine Dipeptide MD Example
 
-## 8. Troubleshooting
-
-- Import errors referencing `simtk` are legacy noise; warnings are filtered where practical.
-- If CUDA is not available, OpenMM will silently fall back to CPU unless you force a platform.
-- Force shape should be (N, 3). If you see dtype mismatches, inspect `result.traced_dtype` or the force object's `_animm_traced_dtype` attribute.
-
-## 9. Next Steps
-
-See the API Reference for deeper details and the Development page if you plan to contribute.
-
-## 10. Live Desktop Viewer (Experimental)
-
-You can open a lightweight live viewer window during MD. Add `--live-hold` to keep Matplotlib open:
-
-Command line (alanine example):
+Run a short vacuum MD, reporting every 50 steps:
 
 ```bash
-python -m animm.cli ala2-md --steps 1000 --live-view --live-backend auto
+ani-mm ala2-md --steps 500 --report 50 --ani-model ANI2DR
 ```
 
-Programmatic (generic MD runner):
+JSON output (quiet mode) for integration with scripts:
+
+```bash
+ani-mm ala2-md --steps 500 --json
+```
+
+Key flags:
+
+* `--steps` number of MD steps (default 2000)
+* `--t` temperature (K)
+* `--dt` timestep (fs)
+* `--report` reporting interval (steps)
+* `--ani-model` model name (`ANI2DR`, `ANI2X`)
+* `--platform` force a specific OpenMM platform (e.g. CUDA)
+
+## 4. Programmatic MD Runner
+
+```python
+from animm.alanine_dipeptide import simulate_alanine_dipeptide
+
+info = simulate_alanine_dipeptide(n_steps=300, ani_model="ANI2X", report_interval=50)
+print(info["steps"], info["traced_dtype"], info["cache_hit"])
+```
+
+## 5. TorchScript Tracing & Cache
+
+Tracing attempts float64 first. If the underlying model / operations reject double precision, a float32 retry occurs. The effective dtype appears as:
+
+* Force object attribute `_animm_traced_dtype`
+* MD result dict key `traced_dtype`
+
+Cache key: `(model_name, natoms, dtype)`. Cache hit state is surfaced as `_animm_cache_hit` on the force and `cache_hit` in results.
+
+## 6. Provenance / Debugging
+
+Add `--debug` (or `--log-level DEBUG`) to surface lines showing:
+
+* Trace attempt & success (model, natoms, dtype)
+* Attachment of `TorchForce` with traced dtype & cache status
+* A final `SUMMARY` line summarizing steps, natoms, model, traced dtype, cache, and energy delta
+
+Example fragment:
+
+```text
+[DEBUG] animm.ani_openmm: Traced ANI model=ANI2DR natoms=21 traced=float64 cache_key=ANI2DR|21|float64
+[DEBUG] animm.md: Attached ANI TorchForce model=ANI2DR natoms=21 traced_dtype=float64 cache=miss
+SUMMARY steps=200 natoms=21 model=ANI2DR traced_dtype=float64 cache=hit initial=-1.4415e+06 final=-1.4415e+06
+```
+
+## 7. Converting SMILES → Atoms
 
 ```python
 from animm.convert import smiles_to_ase
-from animm.openmm_runner import run_ani_md
-
 atoms = smiles_to_ase("CCO")
-res = run_ani_md(atoms, n_steps=500, live_view=True, live_interval=50)
+```
+
+RDKit is preferred; if absent a minimal fallback builder is used.
+
+## 8. Live Viewer
+
+Enable during MD:
+
+```bash
+ani-mm ala2-md --steps 400 --live-view --live-backend auto --live-hold
 ```
 
 Backends:
 
-- auto – prefer ASE GUI if available, then Matplotlib.
-- ase – force ASE GUI.
-- mpl – force Matplotlib scatter.
+* `auto` (ASE GUI → Matplotlib)
+* `ase` force ASE GUI
+* `mpl` force Matplotlib
 
-Headless (no display) -> viewer auto‑disables.
+Headless environments auto‑disable viewing. See `live-viewer.md` for performance and color notes.
 
-See `Live Viewer` page for colors, troubleshooting, and performance notes.
+Programmatic generic MD (simplified example):
 
-## 11. Debugging / Verifying ANI Usage
+```python
+from animm.convert import smiles_to_ase
+from animm.openmm_runner import run_ani_md
 
-Add `--debug` (or `--log-level DEBUG`) to surface provenance lines:
-
-```bash
-python -m animm.cli ala2-md --steps 100 --debug
+atoms = smiles_to_ase("CCO")
+res = run_ani_md(atoms, n_steps=250, live_view=True, live_interval=50)
+print(res.traced_dtype)
 ```
 
-Look for lines mentioning `Attached ANI TorchForce` and `Traced ANI model` which confirm the neural potential, atom count, cache hits, and traced dtype.
+## 9. Environment Knobs
+
+* `ANIMM_NO_OMP=1` limit OpenMP / BLAS threads (sets OMP_NUM_THREADS etc.)
+* `--allow-dup-omp` sets `KMP_DUPLICATE_LIB_OK=TRUE` (macOS duplicate runtime workaround)
+
+## 10. Troubleshooting
+
+* Unexpected float32? Look at `_animm_traced_dtype` (float64 attempt failed). Performance differences are usually minor at this scale.
+* Force mismatch shapes: ensure atoms ordering unchanged after conversion.
+* No GUI? Use `--live-backend mpl` or omit `--live-view`.
+* Warnings about deprecated `simtk.openmm` are filtered; can be restored by removing the filters in `animm/__init__.py` and `cli.py`.
+
+## 11. Next Steps
+
+For roadmap, development workflow, and contribution guide see `development.md`.
+
+## 12. Minimal API Surface
+
+Primary entry points:
+
+* `animm.ani.load_ani_model`
+* `animm.ani.ani_energy_forces`
+* `animm.convert.smiles_to_ase`
+* `animm.alanine_dipeptide.simulate_alanine_dipeptide`
+* `animm.openmm_runner.run_ani_md` (generic; internal usage may evolve)
+
+See API reference for full docstrings.
