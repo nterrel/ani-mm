@@ -115,3 +115,13 @@ Backends:
 Headless (no display) -> viewer auto‑disables.
 
 See `Live Viewer` page for colors, troubleshooting, and performance notes.
+
+## 11. Debugging / Verifying ANI Usage
+
+Add `--debug` (or `--log-level DEBUG`) to surface provenance lines:
+
+```bash
+python -m animm.cli ala2-md --steps 100 --debug
+```
+
+Look for lines mentioning `Attached ANI TorchForce` and `Traced ANI model` which confirm the neural potential, atom count, cache hits, and traced dtype.

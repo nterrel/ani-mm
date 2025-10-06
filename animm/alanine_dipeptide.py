@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
+import logging
 from typing import Any, Dict, Optional
 
 try:  # pragma: no cover - import guard
@@ -78,6 +79,7 @@ def simulate_alanine_dipeptide(
     Dictionary containing simulation metadata and energies. Per‑step progress
     is printed to stdout (unless redirected) via a lightweight reporter.
     """
+    log = logging.getLogger("animm.ala2")
     if openmm is None or app is None or unit is None:  # pragma: no cover
         raise ImportError(
             "OpenMM is required for simulate_alanine_dipeptide; install openmm first."
@@ -129,6 +131,7 @@ END
 
     # Try OpenMM TorchForce path first; fallback to pure ASE MD if plugin missing.
     engine = "openmm-torch"
+    live_viewer = None  # ensure defined for later finalize block
     try:
         from .ani_openmm import build_ani_torch_force  # noqa: WPS433
     except Exception:  # pragma: no cover - fallback path
@@ -136,6 +139,7 @@ END
         engine = "ase"
 
     initial_pot = None
+    ani_torch_force = None  # type: ignore
     if engine == "openmm-torch" and build_ani_torch_force is not None:
         system = openmm.System()
         for atom in pdb.topology.atoms():
@@ -144,6 +148,11 @@ END
             topology=pdb.topology,
             model_name=ani_model,
             threads=ani_threads,
+        )
+        log.debug(
+            "Alanine MD using ANI model=%s natoms=%d traced_dtype=%s",
+            ani_model.upper(), pdb.topology.getNumAtoms(), getattr(
+                ani_torch_force, "_animm_traced_dtype", "unknown")
         )
         system.addForce(ani_torch_force)
         # Integrator: convert timestep fs -> ps
@@ -166,7 +175,9 @@ END
             except Exception:  # pragma: no cover
                 pass
         if minimize:
+            log.debug("Alanine: minimization start")
             sim.minimizeEnergy()
+            log.debug("Alanine: minimization end")
         init_state = sim.context.getState(getEnergy=True, getVelocities=True)
         initial_pot = init_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
         kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
@@ -184,7 +195,8 @@ END
         if live_view:
             try:  # pragma: no cover - GUI optional
                 symbols = [a.element.symbol for a in pdb.topology.atoms()]
-                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0) for pos in pdb.positions]
+                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0)
+                               for pos in pdb.positions]
                 import numpy as _np
 
                 from .gui import build_live_viewer_reporter  # type: ignore
@@ -193,7 +205,8 @@ END
                     symbols,
                     interval=report_interval,
                     backend=live_backend,
-                    initial_positions_ang=_np.asarray(initial_ang, dtype=float),
+                    initial_positions_ang=_np.asarray(
+                        initial_ang, dtype=float),
                     hold_open=hold_open,
                 )
                 sim.reporters.append(live_reporter)
@@ -218,34 +231,41 @@ END
                 return (self.interval, False, False, False, True)
 
             def report(self, simulation, state):  # noqa: N802
-                pot = state.getPotentialEnergy().value_in_unit(
-                    unit.kilojoule_per_mole
-                )  # type: ignore[attr-defined]
+                # unit is guaranteed non-None earlier; add ignore for static analyzers
+                pot = state.getPotentialEnergy().value_in_unit(  # type: ignore[attr-defined]
+                    unit.kilojoule_per_mole  # type: ignore[attr-defined]
+                )
                 try:
-                    ke = state.getKineticEnergy().value_in_unit(
-                        unit.kilojoule_per_mole
-                    )  # type: ignore[attr-defined]
+                    ke = state.getKineticEnergy().value_in_unit(  # type: ignore[attr-defined]
+                        unit.kilojoule_per_mole  # type: ignore[attr-defined]
+                    )
                     dof_loc = 3 * simulation.topology.getNumAtoms()
                     temp = (2 * ke) / (dof_loc * kB_kj)
                 except Exception:  # pragma: no cover - kinetic energy retrieval issues
                     temp = float("nan")
                 delta = pot - self.initial
                 if not self._printed_header:
-                    sys.stdout.write('#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
+                    sys.stdout.write(
+                        '#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
                     self._printed_header = True
-                sys.stdout.write(f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
+                sys.stdout.write(
+                    f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
                 sys.stdout.flush()
 
-        # Attach our custom reporter last so header appears after any OpenMM messages
+        # Attach custom reporter last so header appears after any OpenMM messages
         sim.reporters.append(_DeltaReporter(report_interval, initial_pot))
-        print(f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
+        print(
+            f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
         sys.stdout.flush()
+        log.debug("Alanine MD start steps=%d dt_fs=%.2f", n_steps, timestep_fs)
         sim.step(n_steps)
+        log.debug("Alanine MD complete")
         state = sim.context.getState(getEnergy=True)
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
         try:  # finalize viewer
             if (
-                live_view and live_viewer is not None and getattr(live_viewer, "enabled", False)
+                live_view and live_viewer is not None and getattr(
+                    live_viewer, "enabled", False)
             ):  # pragma: no cover - GUI
                 live_viewer.finalize()  # type: ignore
         except Exception:  # pragma: no cover
@@ -260,7 +280,8 @@ END
         from .ani import load_ani_model  # reuse existing loader
 
         symbols = [atom.element.symbol for atom in pdb.topology.atoms()]
-        coords_ang = [(pos.x, pos.y, pos.z) for pos in pdb.positions]  # OpenMM gives nanometers
+        coords_ang = [(pos.x, pos.y, pos.z)
+                      for pos in pdb.positions]  # OpenMM gives nanometers
         # Convert nm -> Å
         coords_ang = [(x * 10.0, y * 10.0, z * 10.0) for x, y, z in coords_ang]
         ase_atoms = Atoms(symbols=symbols, positions=coords_ang)
@@ -301,5 +322,14 @@ END
             (final_pot - initial_pot)
             if (engine == "openmm-torch" and initial_pot is not None)
             else None
+        ),
+        **(
+            {
+                "traced_dtype": getattr(ani_torch_force, "_animm_traced_dtype", None),
+                "cache_hit": getattr(ani_torch_force, "_animm_cache_hit", None),
+                "natoms": pdb.topology.getNumAtoms(),
+            }
+            if ani_torch_force is not None and engine == "openmm-torch"
+            else {}
         ),
     }

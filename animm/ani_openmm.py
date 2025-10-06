@@ -45,7 +45,8 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         # positions_nm shape (N, 3) in nm (OpenMM convention). Cast to model dtype.
         # type: ignore[stop-iteration]
         model_dtype = next(self.ani_model.parameters()).dtype
-        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(
+            0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -121,10 +122,14 @@ def build_ani_torch_force(
     module = ANIPotentialModule(ani_model, species)
     n_atoms = species.shape[1]
     key = (model_name.upper(), n_atoms, dtype)
+    log = logging.getLogger("animm.ani_openmm")
+    cache_hit = False
     if cache and key in _TRACED_CACHE:
         traced = _TRACED_CACHE[key]
+        cache_hit = True
     else:
-        example = torch.zeros((n_atoms, 3), dtype=getattr(torch, requested_dtype))
+        example = torch.zeros(
+            (n_atoms, 3), dtype=getattr(torch, requested_dtype))
         try:
             with torch.no_grad():  # tracing only
                 traced = torch.jit.trace(module, example)
@@ -146,12 +151,26 @@ def build_ani_torch_force(
                 raise
         if cache:
             _TRACED_CACHE[key] = traced
+        log.debug(
+            "Traced ANI model=%s natoms=%d requested_dtype=%s final_dtype=%s cache_store=%s",
+            model_name.upper(), n_atoms, requested_dtype, key[2], cache
+        )
+    if cache_hit:
+        log.debug(
+            "Cache hit ANI model=%s natoms=%d dtype=%s", model_name.upper(
+            ), n_atoms, key[2]
+        )
     tf = TorchForce(traced)
     # attach metadata so callers can inspect true traced dtype
     try:  # pragma: no cover - attribute assignment safety
         setattr(tf, "_animm_traced_dtype", key[2])
+        setattr(tf, "_animm_cache_hit", cache_hit)
     except Exception:  # pragma: no cover
         pass
+    log.debug(
+        "Built TorchForce model=%s natoms=%d traced_dtype=%s cache_hit=%s",
+        model_name.upper(), n_atoms, key[2], cache_hit
+    )
     return tf
 
 

@@ -144,6 +144,25 @@ from animm.ani_openmm import clear_traced_cache
 clear_traced_cache()
 ```
 
+### Debug / provenance
+
+Want to be sure you're really using ANI and which traced dtype got picked? Add `--debug` to the CLI (or set log level to DEBUG programmatically). Third‑party downloader chatter is trimmed so you mainly see `animm.*` lines like:
+
+```text
+[DEBUG] animm.ani_openmm: Cache hit ANI model=ANI2DR natoms=21 dtype=float64
+[DEBUG] animm.md: Attached ANI TorchForce model=ANI2DR natoms=21 requested_dtype=float64 traced_dtype=float64
+```
+
+That confirms the neural potential is active (and whether a float64→float32 fallback occurred). If you see no such lines, you're probably not running through the ANI TorchForce path.
+
+Non‑JSON alanine runs also print a one‑line summary:
+
+```text
+SUMMARY steps=100 natoms=21 model=ANI2DR traced_dtype=float64 cache=hit initial=-1441506.553410 final=-1441491.796582 delta=14.756827 kJ/mol
+```
+
+`cache=miss` appears the first time in a fresh process; subsequent identical runs should be `cache=hit`.
+
 ## Warning suppression
 
 Filters a few recurring lines (legacy `simtk.openmm` deprecation, experimental model notices). Remove the filters or set `PYTHONWARNINGS=default` to restore noise.

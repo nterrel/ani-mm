@@ -10,6 +10,9 @@ All notable changes will be documented in this file. The format loosely follows 
 * `--live-hold` flag to keep Matplotlib window open after simulation.
 * ASE fallback diagnostics including `tkinter` probe hints.
 * Dedicated `docs/live-viewer.md` page and documentation overhaul.
+* `--debug` flag for verbose provenance (trace cache hits, traced dtype, MD parameters).
+* Alanine MD summary line (`SUMMARY ...`) with natoms, traced dtype, cache hit/miss.
+* Trimmed third-party debug noise (filelock, urllib3, huggingface_hub) when `--debug`.
 
 ### Changed
 
@@ -20,6 +23,6 @@ All notable changes will be documented in this file. The format loosely follows 
 
 * Avoid recreation of Matplotlib scatter every frame (performance + flicker).
 
-## 0.2.0 - 2025-??-??
+## 0.2.0 - 2025-10-05
 
 * Initial publicized 0.2 baseline (ANI model loading, TorchForce integration, alanine example, basic MD runner, tracing cache, initial docs).
