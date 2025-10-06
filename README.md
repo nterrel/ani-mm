@@ -1,6 +1,6 @@
 # ani-mm
 
-Lean helpers to run TorchANI ANI models inside OpenMM via `TorchForce`, plus tiny utilities for SMILES → atoms, single‑point energy/forces, and a minimal MD example (alanine dipeptide) with an optional live viewer.
+Helpers to run TorchANI ANI models inside OpenMM via `TorchForce`, plus tiny utilities for SMILES → atoms, single‑point energy/forces, and a minimal MD example (alanine dipeptide) with an optional live viewer.
 
 > Keep the README light. Detailed guides, provenance, and advanced notes now live under `docs/`.
 
@@ -85,7 +85,7 @@ Full list: `docs/development.md`.
 ## Tests
 
 ```bash
-pytest -q
+pytest -q tests
 ```
 
 ## License

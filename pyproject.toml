@@ -83,7 +83,14 @@ ignore = ["F401", "E402", "E501"]  # ignore unused-import warnings globally (use
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --cov=animm --cov-report=term-missing"
+# Quieter default test output:
+#  - keep coverage but use 'term' (no per-missing-line dump)
+#  - retain -q for compact progress
+# To get full detail (missing lines + skipped summary):
+#     pytest --cov=animm --cov-report=term-missing -ra
+# To run fastest (no coverage):
+#     pytest -q --no-cov
+addopts = "-q --cov=animm --cov-report=term"
 
 [tool.mypy]
 python_version = "3.9"
