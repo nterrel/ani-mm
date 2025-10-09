@@ -19,9 +19,8 @@ def _filter_warnings():
             "ignore",
             message=r"Converting a tensor to a Python (boolean|integer) might cause the trace",
         )
-    # Generic shape assertion tracer noise
     warnings.filterwarnings(
         "ignore",
-        message=r"Converting a tensor to a Python boolean might cause the trace",
+        message=r"<frozen importlib._bootstrap>:241"
     )
     yield

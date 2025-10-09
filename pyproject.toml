@@ -91,6 +91,11 @@ minversion = "7.0"
 # To run fastest (no coverage):
 #     pytest -q --no-cov
 addopts = "-q --cov=animm --cov-report=term"
+filterwarnings = [
+  "ignore:.*builtin type (SwigPyPacked|SwigPyObject|swigvarlink) has no __module__ attribute:DeprecationWarning",
+  "ignore::DeprecationWarning:importlib._bootstrap",
+  "ignore::DeprecationWarning:importlib._bootstrap_external",
+]
 
 [tool.mypy]
 python_version = "3.9"
