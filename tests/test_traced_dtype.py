@@ -5,13 +5,8 @@ from animm.ani_openmm import (  # type: ignore
     build_ani_torch_force,
     clear_traced_cache,
 )
-
-try:
-    import openmm  # noqa: F401
-    import openmm.app as app  # type: ignore
-except Exception:  # pragma: no cover
-    openmm = None  # type: ignore
-    app = None  # type: ignore
+import openmm
+import openmm.app as app
 
 
 @pytest.mark.skipif(openmm is None, reason="OpenMM not available")

@@ -1,9 +1,5 @@
 import pytest
-
-try:
-    import openmm  # noqa: F401
-except Exception:  # pragma: no cover
-    openmm = None  # type: ignore
+import openmm
 
 
 @pytest.mark.skipif(openmm is None, reason="OpenMM not available")

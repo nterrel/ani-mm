@@ -7,20 +7,17 @@ import pytest
 @pytest.fixture(autouse=True)
 def _filter_warnings():
     warnings.filterwarnings("ignore", message=r"ANI-2xr is experimental")
-    warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"openmm")
+    warnings.filterwarnings(
+        "ignore", category=DeprecationWarning, module=r"openmm")
     # Suppress noisy Torch tracing / TracerWarnings produced during TorchScript trace
-    try:  # pragma: no cover
-        import torch.jit  # noqa: WPS433
+    try:
+        import torch.jit
         from torch.jit import TracerWarning  # type: ignore
 
         warnings.filterwarnings("ignore", category=TracerWarning)
-    except Exception:  # pragma: no cover - if torch layout changes
+    except Exception:
         warnings.filterwarnings(
             "ignore",
             message=r"Converting a tensor to a Python (boolean|integer) might cause the trace",
         )
-    warnings.filterwarnings(
-        "ignore",
-        message=r"<frozen importlib._bootstrap>:241"
-    )
     yield

@@ -1,5 +1,4 @@
 import pytest
-
 from animm.ani import get_raw_ani_model, load_ani_model
 from animm.ani_openmm import (  # type: ignore
     _TRACED_CACHE,
@@ -7,14 +6,7 @@ from animm.ani_openmm import (  # type: ignore
     clear_traced_cache,
 )
 from animm.openmm_runner import run_ani_md
-
-try:
-    import openmm  # noqa: F401
-    import openmm.app as app  # noqa: F401
-    import openmm.unit as unit  # noqa: F401
-except Exception:  # pragma: no cover
-    openmm = None  # type: ignore
-
+import openmm
 from ase import Atoms
 
 
@@ -85,12 +77,14 @@ def test_cache_reuse():
 
     top, _ = _ase_to_openmm_topology(atoms)
     try:
-        build_ani_torch_force(top, model_name="ANI2DR", dtype="float64", cache=True)
+        build_ani_torch_force(top, model_name="ANI2DR",
+                              dtype="float64", cache=True)
     except ImportError:
         pytest.skip("TorchForce unavailable")
     size_after_first = len(_TRACED_CACHE)
     # Build second identical TorchForce
-    build_ani_torch_force(top, model_name="ANI2DR", dtype="float64", cache=True)
+    build_ani_torch_force(top, model_name="ANI2DR",
+                          dtype="float64", cache=True)
     size_after_second = len(_TRACED_CACHE)
     assert size_after_second == size_after_first  # no new cache entries
 
@@ -119,7 +113,8 @@ def test_tracing_fallback_float32(monkeypatch):
         if call_state["calls"] == 0:
             call_state["calls"] += 1
             # simulate dtype mismatch error message shape used in code
-            raise RuntimeError("could not create a tensor of scalar type Double")
+            raise RuntimeError(
+                "could not create a tensor of scalar type Double")
         return real_trace(mod, example, *args, **kwargs)
 
     monkeypatch.setattr(torch.jit, "trace", failing_trace)
@@ -128,12 +123,14 @@ def test_tracing_fallback_float32(monkeypatch):
 
     top, _ = _ase_to_openmm_topology(atoms)
     try:
-        build_ani_torch_force(top, model_name="ANI2DR", dtype="float64", cache=True)
+        build_ani_torch_force(top, model_name="ANI2DR",
+                              dtype="float64", cache=True)
     except ImportError:
         pytest.skip("TorchForce unavailable")
 
     # After fallback we expect either a float32 or float64 entry; ensure at least one cache key ends with float32
-    assert any(key[-1] in ("float64", "float32") for key in _TRACED_CACHE.keys())
+    assert any(key[-1] in ("float64", "float32")
+               for key in _TRACED_CACHE.keys())
     # If fallback executed, second key should be float32
     if any(key[-1] == "float32" for key in _TRACED_CACHE.keys()):
         assert any(key[-1] == "float32" for key in _TRACED_CACHE.keys())
