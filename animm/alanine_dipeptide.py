@@ -6,22 +6,12 @@ Intended for quick smoke tests, not benchmarking.
 
 from __future__ import annotations
 
-import contextlib
-import io
 import logging
 import sys
 from typing import Any, Dict, Optional
-
-try:  # pragma: no cover - import guard
-    # swallow simtk deprecation line
-    with contextlib.redirect_stderr(io.StringIO()):
-        import openmm
-        import openmm.app as app
-        import openmm.unit as unit
-except Exception:  # pragma: no cover - optional dependency placeholder
-    openmm = None  # type: ignore
-    app = None  # type: ignore
-    unit = None  # type: ignore
+import openmm
+import openmm.app as app
+import openmm.unit as unit
 
 
 def simulate_alanine_dipeptide(
@@ -195,7 +185,8 @@ END
         if live_view:
             try:  # pragma: no cover - GUI optional
                 symbols = [a.element.symbol for a in pdb.topology.atoms()]
-                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0) for pos in pdb.positions]
+                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0)
+                               for pos in pdb.positions]
                 import numpy as _np
 
                 from .gui import build_live_viewer_reporter  # type: ignore
@@ -204,7 +195,8 @@ END
                     symbols,
                     interval=report_interval,
                     backend=live_backend,
-                    initial_positions_ang=_np.asarray(initial_ang, dtype=float),
+                    initial_positions_ang=_np.asarray(
+                        initial_ang, dtype=float),
                     hold_open=hold_open,
                 )
                 sim.reporters.append(live_reporter)
@@ -243,14 +235,17 @@ END
                     temp = float("nan")
                 delta = pot - self.initial
                 if not self._printed_header:
-                    sys.stdout.write('#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
+                    sys.stdout.write(
+                        '#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
                     self._printed_header = True
-                sys.stdout.write(f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
+                sys.stdout.write(
+                    f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
                 sys.stdout.flush()
 
         # Attach custom reporter last so header appears after any OpenMM messages
         sim.reporters.append(_DeltaReporter(report_interval, initial_pot))
-        print(f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
+        print(
+            f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
         sys.stdout.flush()
         log.debug("Alanine MD start steps=%d dt_fs=%.2f", n_steps, timestep_fs)
         sim.step(n_steps)
@@ -259,7 +254,8 @@ END
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
         try:  # finalize viewer
             if (
-                live_view and live_viewer is not None and getattr(live_viewer, "enabled", False)
+                live_view and live_viewer is not None and getattr(
+                    live_viewer, "enabled", False)
             ):  # pragma: no cover - GUI
                 live_viewer.finalize()  # type: ignore
         except Exception:  # pragma: no cover
@@ -274,7 +270,8 @@ END
         from .ani import load_ani_model  # reuse existing loader
 
         symbols = [atom.element.symbol for atom in pdb.topology.atoms()]
-        coords_ang = [(pos.x, pos.y, pos.z) for pos in pdb.positions]  # OpenMM gives nanometers
+        coords_ang = [(pos.x, pos.y, pos.z)
+                      for pos in pdb.positions]  # OpenMM gives nanometers
         # Convert nm -> Å
         coords_ang = [(x * 10.0, y * 10.0, z * 10.0) for x, y, z in coords_ang]
         ase_atoms = Atoms(symbols=symbols, positions=coords_ang)

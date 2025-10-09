@@ -10,6 +10,7 @@ Summary:
 
 from __future__ import annotations
 
+import importlib
 import logging
 from typing import Any, Dict, Tuple
 
@@ -18,12 +19,11 @@ import torch
 _torchforce_import_error = None
 TorchForce = None  # type: ignore
 for _mod_name in ("openmmtorch", "openmm_torch"):
-    if TorchForce is not None:
+    try:  # pragma: no cover - plugin discovery
+        module = importlib.import_module(_mod_name)
+        TorchForce = getattr(module, "TorchForce")
         break
-    try:  # pragma: no cover - import guard
-        # type: ignore[attr-defined]
-        TorchForce = __import__(_mod_name, fromlist=["TorchForce"]).TorchForce
-    except Exception as exc:  # store last error
+    except ImportError as exc:  # keep last; try next alias
         _torchforce_import_error = exc
         continue
 
@@ -44,7 +44,8 @@ class ANIPotentialModule(torch.nn.Module):  # pragma: no cover - executed inside
         # positions_nm: (N,3) nm -> cast, expand, convert to Å, evaluate.
         # type: ignore[stop-iteration]
         model_dtype = next(self.ani_model.parameters()).dtype
-        pos_ang = positions_nm.to(model_dtype).unsqueeze(0) * 10.0  # (1, N, 3) Å
+        pos_ang = positions_nm.to(model_dtype).unsqueeze(
+            0) * 10.0  # (1, N, 3) Å
         out = self.ani_model((self.species, pos_ang))
         # TorchANI returns (energies) or object with energies
         if hasattr(out, "energies"):
@@ -131,7 +132,8 @@ def build_ani_torch_force(
         traced = _TRACED_CACHE[key]
         cache_hit = True
     else:
-        example = torch.zeros((n_atoms, 3), dtype=getattr(torch, requested_dtype))
+        example = torch.zeros(
+            (n_atoms, 3), dtype=getattr(torch, requested_dtype))
         try:
             with torch.no_grad():  # tracing only
                 traced = torch.jit.trace(module, example)
@@ -162,7 +164,8 @@ def build_ani_torch_force(
             cache,
         )
     if cache_hit:
-        log.debug("Cache hit ANI model=%s natoms=%d dtype=%s", model_name.upper(), n_atoms, key[2])
+        log.debug("Cache hit ANI model=%s natoms=%d dtype=%s",
+                  model_name.upper(), n_atoms, key[2])
     tf = TorchForce(traced)
     # attach metadata so callers can inspect true traced dtype
     try:  # pragma: no cover - attribute assignment safety

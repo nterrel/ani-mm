@@ -47,6 +47,7 @@ CLI (installed entry point `ani-mm`):
 ```bash
 ani-mm models
 ani-mm eval CCO --model ANI2X --json
+ani-mm md "NCC(=O)O" --steps 1000 --model ANI2DR --dt 1.0 --t 300 --report 100 --dcd gly.dcd
 ani-mm ala2-md --steps 400 --t 300 --dt 2.0 --report 50 --debug
 ani-mm ala2-md --steps 400 --live-view --live-backend auto --live-hold
 ```

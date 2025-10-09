@@ -28,18 +28,9 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings(
     "ignore",
-    message=r"Warning: importing 'simtk.openmm' is deprecated",
+    message=r"Warning: importing 'simtk.openmm' is deprecated.  Import 'openmm' instead.",
     category=UserWarning,
 )
-
-
-class _SimTKDeprecationFilter(logging.Filter):  # pragma: no cover - simple filter
-    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
-        return "importing 'simtk.openmm' is deprecated" not in record.getMessage()
-
-
-logging.getLogger().addFilter(_SimTKDeprecationFilter())
-
 
 # Apply OpenMP thread limiting early if user requested
 if os.environ.get("ANIMM_NO_OMP") == "1":  # pragma: no cover - environment specific
@@ -139,6 +130,50 @@ def main(argv: list[str] | None = None):
     p_models = sub.add_parser(
         "models", help="List available ANI models", parents=[parent])
     p_models.add_argument("--json", action="store_true", help="Emit JSON list")
+
+    # Generic MD from arbitrary SMILES (not just alanine demonstration)
+    p_md = sub.add_parser(
+        "md",
+        help="Run ANI Langevin MD for a molecule built from a SMILES string",
+        parents=[parent],
+    )
+    p_md.add_argument(
+        "smiles", help="Input SMILES string (hydrogens added if RDKit present)")
+    p_md.add_argument(
+        "--model",
+        default="ANI2DR",
+        help="ANI model name (default ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
+    )
+    p_md.add_argument("--steps", type=int, default=1000,
+                      help="Number of MD steps (default 1000)")
+    p_md.add_argument("--t", type=float, default=300.0,
+                      help="Temperature K (default 300)")
+    p_md.add_argument("--dt", type=float, default=1.0,
+                      help="Timestep fs (default 1.0)")
+    p_md.add_argument(
+        "--report", type=int, default=100, help="Report / trajectory interval in steps (default 100)"
+    )
+    p_md.add_argument("--dcd", default=None, help="Optional DCD output path")
+    p_md.add_argument("--platform", default=None,
+                      help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_md.add_argument(
+        "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
+    )
+    p_md.add_argument("--seed", type=int, default=None,
+                      help="Random seed for integrator RNG")
+    p_md.add_argument("--no-min", action="store_true",
+                      help="Skip energy minimization")
+    p_md.add_argument(
+        "--dtype",
+        default="float64",
+        choices=["float64", "float32"],
+        help="Preferred Torch dtype for tracing (fallback may occur)",
+    )
+    p_md.add_argument(
+        "--no-traj", action="store_true", help="Do not collect in-memory trajectory frames"
+    )
+    p_md.add_argument("--json", action="store_true",
+                      help="Emit JSON summary instead of text")
 
     args = parser.parse_args(argv)
 
@@ -274,6 +309,64 @@ def main(argv: list[str] | None = None):
             sim_info.get("model"),
             sim_info.get("final_potential_kjmol"),
             sim_info.get("engine"),
+        )
+        return 0
+
+    if args.cmd == "md":
+        # Lazy import MD runner only when needed
+        from .openmm_runner import run_ani_md  # noqa: WPS433
+
+        atoms = smiles_to_ase(args.smiles)
+        md_res = run_ani_md(
+            ase_atoms=atoms,
+            model=args.model,
+            n_steps=args.steps,
+            temperature_K=args.t,
+            dt_fs=args.dt,
+            report_interval=args.report,
+            dcd_path=args.dcd,
+            collect_trajectory=not args.no_traj,
+            platform=args.platform,
+            ani_threads=args.ani_threads,
+            seed=args.seed,
+            minimize=not args.no_min,
+            dtype=args.dtype,
+            progress=True,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "smiles": args.smiles,
+                        "steps": md_res.steps,
+                        "model": md_res.model,
+                        "traced_dtype": md_res.dtype,
+                        "final_potential_kjmol": md_res.final_potential_kjmol,
+                        "final_temperature_K": md_res.final_temperature_K,
+                        "dcd_path": md_res.dcd_path,
+                        "n_frames": None if md_res.positions is None else int(md_res.positions.shape[0]),
+                    }
+                )
+            )
+        else:
+            extra_traj = (
+                f" frames={md_res.positions.shape[0]}" if md_res.positions is not None else ""
+            )
+            temp_str = (
+                f" temp={md_res.final_temperature_K:.1f}K" if md_res.final_temperature_K else ""
+            )
+            print(
+                f"Finished steps={md_res.steps} model={md_res.model} final_potential={md_res.final_potential_kjmol:.2f} kJ/mol traced_dtype={md_res.dtype}{temp_str}{extra_traj}"
+            )
+            print(
+                f"SUMMARY steps={md_res.steps} model={md_res.model} traced_dtype={md_res.dtype} final={md_res.final_potential_kjmol:.6f}"
+            )
+        log.debug(
+            "Generic MD done steps=%d model=%s final=%.3f engine=%s",
+            md_res.steps,
+            md_res.model,
+            md_res.final_potential_kjmol,
+            md_res.engine,
         )
         return 0
 

@@ -17,6 +17,9 @@ dist/
 .coverage
 htmlcov/
 
+# Trajectory files
+*.dcd
+
 # Mac
 .DS_Store
 
