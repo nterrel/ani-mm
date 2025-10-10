@@ -123,7 +123,7 @@ END
     live_viewer = None  # ensure defined for later finalize block
     try:
         from .ani_openmm import build_ani_torch_force  # noqa: WPS433
-    except Exception:  # pragma: no cover - fallback path
+    except Exception:
         build_ani_torch_force = None  # type: ignore
         engine = "ase"
 
@@ -160,7 +160,6 @@ END
 
         if seed is not None:
             try:
-                # type: ignore[attr-defined]
                 integrator.setRandomNumberSeed(int(seed))
             except Exception:  # pragma: no cover
                 pass

@@ -121,11 +121,10 @@ class _InMemoryReporter:
             state.getPositions(asNumpy=True).value_in_unit(
                 unit.nanometer) * 10.0  # type: ignore[attr-defined]
         )
-        # type: ignore[attr-defined]
         self.frames.append(np.array(pos, dtype=float))
         self.times_ps.append(
-            state.getTime().value_in_unit(unit.picosecond)
-        )  # type: ignore[attr-defined]
+            state.getTime().value_in_unit(unit.picosecond)  # type: ignore[attr-defined]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -287,10 +286,8 @@ def run_ani_md(
                         unit.kilojoule_per_mole  # type: ignore[attr-defined]
                     )
                     kB_loc = (
-                        # type: ignore[attr-defined]
-                        unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+                        unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA  # type: ignore[attr-defined]
                     )
-                    # type: ignore[attr-defined]
                     kBkj = kB_loc.value_in_unit(
                         unit.kilojoule_per_mole / unit.kelvin)  # type: ignore[attr-defined]
                     dof_loc = 3 * simulation.topology.getNumAtoms()
