@@ -62,7 +62,7 @@ def get_raw_ani_model(model_name: str = DEFAULT_MODEL) -> torch.nn.Module:
 
 def load_ani_model(model_name: str = DEFAULT_MODEL):
     """Return an ASE‑compatible calculator wrapper for the given model."""
-    return get_raw_ani_model(model_name).ase()  # type: ignore[attr-defined]
+    return get_raw_ani_model(model_name).ase()  # type: ignore
 
 
 def list_available_ani_models() -> List[str]:  # pragma: no cover - simple probe
@@ -99,8 +99,7 @@ def ani_energy_forces(ani_model, ase_atoms) -> ANIEvaluation:
     try:
         forces = ani_model.get_forces(ase_atoms)
     except Exception as exc:  # pragma: no cover - unexpected API change
-        raise RuntimeError(
-            "Unable to retrieve forces via TorchANI ASE interface") from exc
+        raise RuntimeError("Unable to retrieve forces via TorchANI ASE interface") from exc
     return ANIEvaluation(
         energy=torch.tensor([energy], dtype=torch.float64),
         forces=torch.tensor(forces, dtype=torch.float64),

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import sys
 from typing import Any, Dict, Optional
+
 import openmm
 import openmm.app as app
 import openmm.unit as unit
@@ -122,7 +123,7 @@ END
     engine = "openmm-torch"
     live_viewer = None  # ensure defined for later finalize block
     try:
-        from .ani_openmm import build_ani_torch_force  # noqa: WPS433
+        from .ani_openmm import build_ani_torch_force
     except Exception:
         build_ani_torch_force = None  # type: ignore
         engine = "ase"
@@ -148,9 +149,9 @@ END
         # Integrator: convert timestep fs -> ps
         dt_ps = timestep_fs * 1e-3
         integrator = openmm.LangevinIntegrator(
-            temperature * unit.kelvin,  # type: ignore[operator]
-            friction_per_ps / unit.picosecond,  # type: ignore[operator]
-            dt_ps * unit.picoseconds,  # type: ignore[operator]
+            temperature * unit.kelvin,  # type: ignore
+            friction_per_ps / unit.picosecond,  # type: ignore
+            dt_ps * unit.picoseconds,  # type: ignore
         )
         platform = None
         if platform_name:
@@ -184,8 +185,7 @@ END
         if live_view:
             try:  # pragma: no cover - GUI optional
                 symbols = [a.element.symbol for a in pdb.topology.atoms()]
-                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0)
-                               for pos in pdb.positions]
+                initial_ang = [(pos.x * 10.0, pos.y * 10.0, pos.z * 10.0) for pos in pdb.positions]
                 import numpy as _np
 
                 from .gui import build_live_viewer_reporter  # type: ignore
@@ -194,8 +194,7 @@ END
                     symbols,
                     interval=report_interval,
                     backend=live_backend,
-                    initial_positions_ang=_np.asarray(
-                        initial_ang, dtype=float),
+                    initial_positions_ang=_np.asarray(initial_ang, dtype=float),
                     hold_open=hold_open,
                 )
                 sim.reporters.append(live_reporter)
@@ -221,12 +220,12 @@ END
 
             def report(self, simulation, state):  # noqa: N802
                 # unit is guaranteed non-None earlier; add ignore for static analyzers
-                pot = state.getPotentialEnergy().value_in_unit(  # type: ignore[attr-defined]
-                    unit.kilojoule_per_mole  # type: ignore[attr-defined]
+                pot = state.getPotentialEnergy().value_in_unit(  # type: ignore
+                    unit.kilojoule_per_mole  # type: ignore
                 )
                 try:
-                    ke = state.getKineticEnergy().value_in_unit(  # type: ignore[attr-defined]
-                        unit.kilojoule_per_mole  # type: ignore[attr-defined]
+                    ke = state.getKineticEnergy().value_in_unit(  # type: ignore
+                        unit.kilojoule_per_mole  # type: ignore
                     )
                     dof_loc = 3 * simulation.topology.getNumAtoms()
                     temp = (2 * ke) / (dof_loc * kB_kj)
@@ -234,17 +233,14 @@ END
                     temp = float("nan")
                 delta = pot - self.initial
                 if not self._printed_header:
-                    sys.stdout.write(
-                        '#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
+                    sys.stdout.write('#"Step","Potential kJ/mol","Delta kJ/mol","Temperature K"\n')
                     self._printed_header = True
-                sys.stdout.write(
-                    f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
+                sys.stdout.write(f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}\n")
                 sys.stdout.flush()
 
         # Attach custom reporter last so header appears after any OpenMM messages
         sim.reporters.append(_DeltaReporter(report_interval, initial_pot))
-        print(
-            f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
+        print(f"Initial potential: {initial_pot:.6f} kJ/mol (T~{initial_temp:.2f} K)")
         sys.stdout.flush()
         log.debug("Alanine MD start steps=%d dt_fs=%.2f", n_steps, timestep_fs)
         sim.step(n_steps)
@@ -253,9 +249,8 @@ END
         final_pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
         try:  # finalize viewer
             if (
-                live_view and live_viewer is not None and getattr(
-                    live_viewer, "enabled", False)
-            ):  # pragma: no cover - GUI
+                live_view and live_viewer is not None and getattr(live_viewer, "enabled", False)
+            ):  # pragma: no cover
                 live_viewer.finalize()  # type: ignore
         except Exception:  # pragma: no cover
             pass
@@ -269,8 +264,7 @@ END
         from .ani import load_ani_model  # reuse existing loader
 
         symbols = [atom.element.symbol for atom in pdb.topology.atoms()]
-        coords_ang = [(pos.x, pos.y, pos.z)
-                      for pos in pdb.positions]  # OpenMM gives nanometers
+        coords_ang = [(pos.x, pos.y, pos.z) for pos in pdb.positions]  # OpenMM gives nanometers
         # Convert nm -> Å
         coords_ang = [(x * 10.0, y * 10.0, z * 10.0) for x, y, z in coords_ang]
         ase_atoms = Atoms(symbols=symbols, positions=coords_ang)

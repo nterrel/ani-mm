@@ -8,13 +8,8 @@ from __future__ import annotations
 
 from ase import Atoms
 from ase.build import molecule
-
-try:
-    from rdkit import Chem  # type: ignore
-    from rdkit.Chem import AllChem  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    Chem = None  # type: ignore
-    AllChem = None  # type: ignore
+from rdkit import Chem  # type: ignore
+from rdkit.Chem import AllChem  # type: ignore
 
 
 def smiles_to_ase(smiles: str, add_h: bool = True, conformer_id: int = 0) -> Atoms:
@@ -27,13 +22,13 @@ def smiles_to_ase(smiles: str, add_h: bool = True, conformer_id: int = 0) -> Ato
         # Fallback: interpret as a known molecule name or formula
         return molecule(smiles)
 
-    mol = Chem.MolFromSmiles(smiles)  # type: ignore[attr-defined]
+    mol = Chem.MolFromSmiles(smiles)  # type: ignore
     if mol is None:
         raise ValueError(f"Invalid SMILES: {smiles}")
     if add_h:
-        mol = Chem.AddHs(mol)  # type: ignore[attr-defined]
-    AllChem.EmbedMolecule(mol, AllChem.ETKDG())  # type: ignore[attr-defined]
-    AllChem.UFFOptimizeMolecule(mol)  # type: ignore[attr-defined]
+        mol = Chem.AddHs(mol)  # type: ignore
+    AllChem.EmbedMolecule(mol, AllChem.ETKDG())  # type: ignore
+    AllChem.UFFOptimizeMolecule(mol)  # type: ignore
     if conformer_id >= mol.GetNumConformers():
         raise ValueError("Conformer index out of range")
 

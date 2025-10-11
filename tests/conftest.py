@@ -7,8 +7,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _filter_warnings():
     warnings.filterwarnings("ignore", message=r"ANI-2xr is experimental")
-    warnings.filterwarnings(
-        "ignore", category=DeprecationWarning, module=r"openmm")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"openmm")
     # Suppress noisy Torch tracing / TracerWarnings produced during TorchScript trace
     try:
         import torch.jit

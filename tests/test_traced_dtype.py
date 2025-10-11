@@ -1,3 +1,5 @@
+import openmm
+import openmm.app as app
 import pytest
 
 from animm.ani_openmm import (  # type: ignore
@@ -5,8 +7,6 @@ from animm.ani_openmm import (  # type: ignore
     build_ani_torch_force,
     clear_traced_cache,
 )
-import openmm
-import openmm.app as app
 
 
 @pytest.mark.skipif(openmm is None, reason="OpenMM not available")

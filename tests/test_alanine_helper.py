@@ -1,5 +1,5 @@
-import pytest
 import openmm
+import pytest
 
 
 @pytest.mark.skipif(openmm is None, reason="OpenMM not available")

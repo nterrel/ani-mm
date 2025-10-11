@@ -11,16 +11,9 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import numpy as np
-
-try:  # clear, minimal OpenMM import guard
-    import openmm  # type: ignore
-    import openmm.app as app  # type: ignore
-    import openmm.unit as unit  # type: ignore
-except ImportError:  # pragma: no cover
-    openmm = None  # type: ignore
-    app = None  # type: ignore
-    unit = None  # type: ignore
-
+import openmm
+import openmm.app as app
+import openmm.unit as unit
 from ase import Atoms
 
 from .ani_openmm import build_ani_torch_force
@@ -67,8 +60,7 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
     only if any cell axis is non‑zero.
     """
     if app is None or unit is None:
-        raise ImportError(
-            "OpenMM is required to build a topology from ASE atoms")
+        raise ImportError("OpenMM is required to build a topology from ASE atoms")
     top = app.Topology()
     chain = top.addChain()
     residue = top.addResidue("MOL", chain)
@@ -79,12 +71,11 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
     # Positions: ASE in Å -> convert to nm
     pos_ang = ase_atoms.get_positions()  # Å
     pos_nm = pos_ang * 0.1
-    positions = [openmm.Vec3(*xyz)  # type: ignore[attr-defined]
-                 for xyz in pos_nm]
+    positions = [openmm.Vec3(*xyz) for xyz in pos_nm]  # type: ignore
     box = ase_atoms.get_cell()  # (3,3) in Å (may be all zeros for non-periodic)
     lengths = None
     if hasattr(box, "lengths"):
-        try:  # pragma: no cover - defensive
+        try:  # pragma: no cover
             lengths = box.lengths()
         except Exception:
             lengths = None
@@ -96,9 +87,9 @@ def _ase_to_openmm_topology(ase_atoms: Atoms):
         if _np.any(arr > 1e-6):
             a, b, c = arr.tolist()
             top.setPeriodicBoxVectors(
-                openmm.Vec3(a * 0.1, 0, 0),  # type: ignore[attr-defined]
-                openmm.Vec3(0, b * 0.1, 0),  # type: ignore[attr-defined]
-                openmm.Vec3(0, 0, c * 0.1),  # type: ignore[attr-defined]
+                openmm.Vec3(a * 0.1, 0, 0),  # type: ignore
+                openmm.Vec3(0, b * 0.1, 0),  # type: ignore
+                openmm.Vec3(0, 0, c * 0.1),  # type: ignore
             )
     return top, positions
 
@@ -117,14 +108,9 @@ class _InMemoryReporter:
 
     def report(self, simulation, state):  # noqa: N802
         # Positions in nm -> convert to Å for user friendliness
-        pos = (
-            state.getPositions(asNumpy=True).value_in_unit(
-                unit.nanometer) * 10.0  # type: ignore[attr-defined]
-        )
+        pos = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer) * 10.0  # type: ignore
         self.frames.append(np.array(pos, dtype=float))
-        self.times_ps.append(
-            state.getTime().value_in_unit(unit.picosecond)  # type: ignore[attr-defined]
-        )
+        self.times_ps.append(state.getTime().value_in_unit(unit.picosecond))  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -223,10 +209,10 @@ def run_ani_md(
 
     # Integrator & Simulation
     dt_ps = dt_fs * 1e-3
-    integrator = openmm.LangevinIntegrator(  # type: ignore[attr-defined]
-        temperature_K * unit.kelvin,  # type: ignore[attr-defined]
-        friction_per_ps / unit.picosecond,  # type: ignore[attr-defined]
-        dt_ps * unit.picosecond,  # type: ignore[attr-defined]
+    integrator = openmm.LangevinIntegrator(
+        temperature_K * unit.kelvin,  # type: ignore
+        friction_per_ps / unit.picosecond,  # type: ignore
+        dt_ps * unit.picosecond,  # type: ignore
     )
     if seed is not None:
         try:  # pragma: no cover - integrator attribute differences
@@ -250,22 +236,20 @@ def run_ani_md(
     if progress:
         state_init = sim.context.getState(getEnergy=True, getVelocities=True)
         initial_potential = state_init.getPotentialEnergy().value_in_unit(
-            unit.kilojoule_per_mole  # type: ignore[attr-defined]
+            unit.kilojoule_per_mole  # type: ignore
         )
         # Approximate initial temperature if kinetic energy present
         try:
-            ke0 = state_init.getKineticEnergy().value_in_unit(  # type: ignore[attr-defined]
-                unit.kilojoule_per_mole  # type: ignore[attr-defined]
+            ke0 = state_init.getKineticEnergy().value_in_unit(  # type: ignore
+                unit.kilojoule_per_mole  # type: ignore
             )
             kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
-            kB_kj_per_mol_K = kB.value_in_unit(
-                unit.kilojoule_per_mole / unit.kelvin)
+            kB_kj_per_mol_K = kB.value_in_unit(unit.kilojoule_per_mole / unit.kelvin)
             dof0 = 3 * topology.getNumAtoms()
             t0 = (2 * ke0) / (dof0 * kB_kj_per_mol_K)
         except Exception:  # pragma: no cover - kinetic retrieval optional
             t0 = float("nan")
-        print(
-            f"Initial potential: {initial_potential:.6f} kJ/mol (T~{t0:.2f} K)")
+        print(f"Initial potential: {initial_potential:.6f} kJ/mol (T~{t0:.2f} K)")
         # Attach lightweight reporter similar to alanine helper
 
         class _ProgressReporter:  # pragma: no cover - simple stdout reporter
@@ -278,18 +262,11 @@ def run_ani_md(
                 return (self.interval, False, False, False, True)
 
             def report(self, simulation, state):  # noqa: N802
-                pot = state.getPotentialEnergy().value_in_unit(  # type: ignore[attr-defined]
-                    unit.kilojoule_per_mole  # type: ignore[attr-defined]
-                )
+                pot = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
                 try:
-                    ke = state.getKineticEnergy().value_in_unit(  # type: ignore[attr-defined]
-                        unit.kilojoule_per_mole  # type: ignore[attr-defined]
-                    )
-                    kB_loc = (
-                        unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA  # type: ignore[attr-defined]
-                    )
-                    kBkj = kB_loc.value_in_unit(
-                        unit.kilojoule_per_mole / unit.kelvin)  # type: ignore[attr-defined]
+                    ke = state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)
+                    kB_loc = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
+                    kBkj = kB_loc.value_in_unit(unit.kilojoule_per_mole / unit.kelvin)
                     dof_loc = 3 * simulation.topology.getNumAtoms()
                     temp = (2 * ke) / (dof_loc * kBkj)
                 except Exception:
@@ -300,8 +277,7 @@ def run_ani_md(
                     self._header = True
                 print(f"{simulation.currentStep},{pot:.6f},{delta:.6f},{temp:.2f}")
 
-        ref_val = float(
-            initial_potential) if initial_potential is not None else 0.0
+        ref_val = float(initial_potential) if initial_potential is not None else 0.0
         sim.reporters.append(_ProgressReporter(report_interval, ref_val))
 
     # Reporters
@@ -314,10 +290,9 @@ def run_ani_md(
     live_viewer = None
     if live_view:
         try:  # Lazy import to avoid hard dependency
-            from .gui import build_live_viewer_reporter  # type: ignore
+            from .gui import build_live_viewer_reporter
 
-            lv_interval = int(live_interval) if live_interval else int(
-                report_interval)
+            lv_interval = int(live_interval) if live_interval else int(report_interval)
             symbols = ase_atoms.get_chemical_symbols()
             live_viewer, live_reporter = build_live_viewer_reporter(
                 symbols, interval=lv_interval, hold_open=hold_open
@@ -329,9 +304,8 @@ def run_ani_md(
 
     # Ensure we capture initial frame if collecting
     if collect_trajectory:
-        state0 = sim.context.getState(
-            getPositions=True, enforcePeriodicBox=False)
-        inmem_reporter.report(sim, state0)  # type: ignore[arg-type]
+        state0 = sim.context.getState(getPositions=True, enforcePeriodicBox=False)
+        inmem_reporter.report(sim, state0)  # type: ignore
 
     log.debug(
         "MD start steps=%d dt_fs=%s temp_K=%.2f platform=%s report_interval=%d live_view=%s",
@@ -346,8 +320,7 @@ def run_ani_md(
     log.debug("MD complete steps=%d", n_steps)
 
     # Final state
-    final_state = sim.context.getState(
-        getEnergy=True, getPositions=True, getVelocities=True)
+    final_state = sim.context.getState(getEnergy=True, getPositions=True, getVelocities=True)
     potential = final_state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
     kinetic = None
     temperature_final = None
@@ -358,8 +331,7 @@ def run_ani_md(
     if kinetic is not None:
         # T = 2 KE / (dof * kB). Use approximate dof = 3N (no constraints assumed)
         kB = unit.BOLTZMANN_CONSTANT_kB * unit.AVOGADRO_CONSTANT_NA
-        kB_kj_per_mol_K = kB.value_in_unit(
-            unit.kilojoule_per_mole / unit.kelvin)
+        kB_kj_per_mol_K = kB.value_in_unit(unit.kilojoule_per_mole / unit.kelvin)
         dof = 3 * topology.getNumAtoms()
         temperature_final = (2.0 * kinetic) / (dof * kB_kj_per_mol_K)
 
@@ -370,7 +342,7 @@ def run_ani_md(
         times_ps = np.array(inmem_reporter.times_ps)
 
     # Determine traced dtype actually used (inspect internal cache key if needed)
-    # heuristic; build_ani_torch_force updates cache key but we did not expose it
+    # heuristic; build_ani_torch_force updates cache key but not exposed
     actual_dtype = getattr(ani_force, "_animm_traced_dtype", dtype)
 
     # Finalize live viewer (leave window open)
@@ -407,7 +379,7 @@ def minimize_and_md(
     n_steps: int = 1000,
     temperature: float = 300.0,
     dt_fs: float = 0.5,
-) -> MDState:  # pragma: no cover - thin wrapper
+) -> MDState:  # pragma: no cover - wrapper
     """Compatibility wrapper delegating to :func:`run_ani_md`.
 
     Returns only an initial/final two–frame trajectory for legacy callers.
@@ -424,9 +396,8 @@ def minimize_and_md(
     )
     if res.positions is not None and res.positions.shape[0] >= 2:
         positions = res.positions[:2]
-    else:  # fallback synthetic
-        positions = np.repeat(np.expand_dims(
-            ase_atoms.get_positions(), 0), repeats=2, axis=0)
+    else:  # fallback
+        positions = np.repeat(np.expand_dims(ase_atoms.get_positions(), 0), repeats=2, axis=0)
     velocities = np.zeros_like(positions)
     time = np.array([0.0, n_steps * dt_fs * 1e-3])
     return MDState(positions=positions, velocities=velocities, time=time)

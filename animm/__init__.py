@@ -29,7 +29,7 @@ def _alias_simtk_openmm() -> None:
     if "simtk.openmm" in sys.modules:  # already real or aliased
         return
     try:
-        import openmm  # noqa: WPS433
+        import openmm
     except ImportError:  # OpenMM genuinely missing; do nothing
         return
     simtk_pkg = types.ModuleType("simtk")

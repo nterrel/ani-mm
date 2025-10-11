@@ -98,10 +98,10 @@ class LiveTrajectoryViewer:
             self.enabled = False
             self._disabled_reason = f"atom count {len(symbols)} exceeds max_atoms={max_atoms}"
             return
-        plt.ion()  # type: ignore[attr-defined]
-        self.fig = plt.figure(figsize=(5, 5))  # type: ignore[call-arg]
+        plt.ion()  # type: ignore
+        self.fig = plt.figure(figsize=(5, 5))  # type: ignore
         try:
-            self.fig.canvas.manager.set_window_title(title)  # type: ignore[attr-defined]
+            self.fig.canvas.manager.set_window_title(title)  # type: ignore
         except Exception:  # pragma: no cover
             pass
         self.ax = self.fig.add_subplot(111, projection="3d")
@@ -167,11 +167,10 @@ class LiveTrajectoryViewer:
             # First frame: build scatter once with colors
             self._scatter = cast(
                 Any,
-                self.ax.scatter(  # type: ignore[call-arg]
+                self.ax.scatter(
                     x,
                     y,
-                    # type: ignore[arg-type]  # 3D scatter accepts array-like
-                    z,
+                    z,  # type: ignore
                     s=40,
                     depthshade=True,
                     c=self._colors if len(self._colors) == len(x) else None,
@@ -181,20 +180,19 @@ class LiveTrajectoryViewer:
             # Fast path: mutate existing scatter artist for stable colors
             try:
                 # 3D PathCollection stores data in _offsets3d tuple
-                # type: ignore[attr-defined]
                 self._scatter._offsets3d = (x, y, z)
             except Exception:
                 # Fallback: recreate scatter (should be rare)
                 try:
                     self._scatter.remove()
-                except Exception:  # pragma: no cover
+                except Exception:
                     pass
                 self._scatter = cast(
                     Any,
-                    self.ax.scatter(  # type: ignore[call-arg]
+                    self.ax.scatter(  # type: ignore
                         x,
                         y,
-                        z,  # type: ignore[arg-type]
+                        z,  # type: ignore
                         s=40,
                         depthshade=True,
                         c=self._colors if len(self._colors) == len(x) else None,
@@ -209,7 +207,7 @@ class LiveTrajectoryViewer:
         self.ax.set_xlim(xmin - pad, xmax + pad)
         self.ax.set_ylim(ymin - pad, ymax + pad)
         self.ax.set_zlim(zmin - pad, zmax + pad)
-        plt.pause(0.001)  # type: ignore[attr-defined]
+        plt.pause(0.001)  # type: ignore
 
     def finalize(self):
         if not self.enabled:
@@ -217,11 +215,11 @@ class LiveTrajectoryViewer:
         try:
             if self._hold_open:
                 # Switch to blocking show so window remains until user closes it.
-                plt.ioff()  # type: ignore[attr-defined]
+                plt.ioff()  # type: ignore
                 self.fig.canvas.draw()
-                plt.show(block=True)  # type: ignore[attr-defined]
+                plt.show(block=True)  # type: ignore
             else:
-                plt.ioff()  # type: ignore[attr-defined]
+                plt.ioff()  # type: ignore
                 self.fig.canvas.draw_idle()
         except Exception:  # pragma: no cover
             pass
@@ -244,14 +242,14 @@ class _ASEAtomsViewer:
             self._disabled_reason = _ASE_GUI_IMPORT_ERROR or "ASE GUI not available"
             return
         self.atoms = _ASEAtoms(symbols=symbols, positions=initial_positions_ang)  # type: ignore
-        try:  # pragma: no cover - GUI backend issues vary
-            self.gui = _ASEGUI(self.atoms)  # type: ignore[call-arg]
+        try:  # pragma: no cover
+            self.gui = _ASEGUI(self.atoms)  # type: ignore
             # Try to launch the GUI event loop in non-blocking mode if supported
             try:
                 run_method = getattr(self.gui, "run", None)
                 if callable(run_method):
                     try:
-                        run_method(block=False)  # type: ignore[call-arg]
+                        run_method(block=False)  # type: ignore
                     except TypeError:
                         # Older ASE may not support block kwarg; fall back to direct call (may block, so skip)
                         pass
@@ -281,7 +279,7 @@ class _ASEAtomsViewer:
         # ASE GUI keeps window alive; nothing to finalize.
         return
 
-    def status(self) -> str:  # type: ignore[override]
+    def status(self) -> str:  # type: ignore
         if self.enabled:
             return "active"
         return f"disabled: {self._disabled_reason}" if self._disabled_reason else "disabled"
@@ -305,12 +303,9 @@ class _LiveViewerReporter:
         self._step = simulation.currentStep
         if not self.viewer.enabled:
             return
-        import openmm.unit as unit  # local import to avoid hard dependency earlier
+        import openmm.unit as unit
 
-        pos_nm = state.getPositions(asNumpy=True).value_in_unit(
-            # type: ignore[attr-defined]  # openmm unit symbols are dynamic
-            unit.nanometer
-        )
+        pos_nm = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)  # type: ignore
         self.viewer.update(np.asarray(pos_nm) * 10.0, self._step)  # nm -> Å
 
 
@@ -338,7 +333,7 @@ def build_live_viewer_reporter(
         window stays open after the simulation ends.
     """
     chosen = backend
-    viewer: LiveViewer  # type: ignore[assignment]
+    viewer: LiveViewer  # type: ignore
     if backend == "auto":
         if _HAVE_ASE_GUI and initial_positions_ang is not None:
             chosen = "ase"

@@ -26,11 +26,6 @@ warnings.filterwarnings(
     message=r"ANI-2xr is experimental",
     category=UserWarning,
 )
-warnings.filterwarnings(
-    "ignore",
-    message=r"Warning: importing 'simtk.openmm' is deprecated.  Import 'openmm' instead.",
-    category=UserWarning,
-)
 
 # Apply OpenMP thread limiting early if user requested
 if os.environ.get("ANIMM_NO_OMP") == "1":  # pragma: no cover - environment specific
@@ -69,33 +64,26 @@ def main(argv: list[str] | None = None):
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p_eval = sub.add_parser(
-        "eval", help="Evaluate ANI energy for a SMILES", parents=[parent])
+    p_eval = sub.add_parser("eval", help="Evaluate ANI energy for a SMILES", parents=[parent])
     p_eval.add_argument("smiles", help="SMILES string")
     p_eval.add_argument(
         "--model",
         default="ANI2DR",
         help="ANI model name (default: ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
     )
-    p_eval.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_eval.add_argument("--json", action="store_true", help="Emit JSON instead of text")
 
     p_ala2 = sub.add_parser(
         "ala2-md", help="Run a short alanine dipeptide vacuum MD simulation", parents=[parent]
     )
-    p_ala2.add_argument("--steps", type=int, default=2000,
-                        help="Number of MD steps (default 2000)")
-    p_ala2.add_argument("--t", type=float, default=300.0,
-                        help="Temperature in K (default 300)")
-    p_ala2.add_argument("--dt", type=float, default=2.0,
-                        help="Timestep in fs (default 2.0)")
+    p_ala2.add_argument("--steps", type=int, default=2000, help="Number of MD steps (default 2000)")
+    p_ala2.add_argument("--t", type=float, default=300.0, help="Temperature in K (default 300)")
+    p_ala2.add_argument("--dt", type=float, default=2.0, help="Timestep in fs (default 2.0)")
     p_ala2.add_argument(
         "--report", type=int, default=50, help="Report interval (steps, default 50)"
     )
-    p_ala2.add_argument("--dcd", default=None,
-                        help="Optional DCD trajectory output path")
-    p_ala2.add_argument("--platform", default=None,
-                        help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_ala2.add_argument("--dcd", default=None, help="Optional DCD trajectory output path")
+    p_ala2.add_argument("--platform", default=None, help="OpenMM platform name (e.g. CUDA, CPU)")
     p_ala2.add_argument(
         "--ani-model",
         default="ANI2DR",
@@ -104,12 +92,9 @@ def main(argv: list[str] | None = None):
     p_ala2.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
-    p_ala2.add_argument("--seed", type=int, default=None,
-                        help="Random seed for integrator RNG")
-    p_ala2.add_argument("--no-min", action="store_true",
-                        help="Skip energy minimization")
-    p_ala2.add_argument("--json", action="store_true",
-                        help="Emit JSON instead of text")
+    p_ala2.add_argument("--seed", type=int, default=None, help="Random seed for integrator RNG")
+    p_ala2.add_argument("--no-min", action="store_true", help="Skip energy minimization")
+    p_ala2.add_argument("--json", action="store_true", help="Emit JSON instead of text")
     p_ala2.add_argument(
         "--live-view",
         action="store_true",
@@ -127,8 +112,7 @@ def main(argv: list[str] | None = None):
         help="If set and using live viewer, keep window open after dynamics (blocks until closed)",
     )
 
-    p_models = sub.add_parser(
-        "models", help="List available ANI models", parents=[parent])
+    p_models = sub.add_parser("models", help="List available ANI models", parents=[parent])
     p_models.add_argument("--json", action="store_true", help="Emit JSON list")
 
     # Generic MD from arbitrary SMILES (not just alanine demonstration)
@@ -137,32 +121,28 @@ def main(argv: list[str] | None = None):
         help="Run ANI Langevin MD for a molecule built from a SMILES string",
         parents=[parent],
     )
-    p_md.add_argument(
-        "smiles", help="Input SMILES string (hydrogens added if RDKit present)")
+    p_md.add_argument("smiles", help="Input SMILES string (hydrogens added if RDKit present)")
     p_md.add_argument(
         "--model",
         default="ANI2DR",
         help="ANI model name (default ANI2DR; options: ANI2DR, ANI2X, ANI2XPeriodic)",
     )
-    p_md.add_argument("--steps", type=int, default=1000,
-                      help="Number of MD steps (default 1000)")
-    p_md.add_argument("--t", type=float, default=300.0,
-                      help="Temperature K (default 300)")
-    p_md.add_argument("--dt", type=float, default=1.0,
-                      help="Timestep fs (default 1.0)")
+    p_md.add_argument("--steps", type=int, default=1000, help="Number of MD steps (default 1000)")
+    p_md.add_argument("--t", type=float, default=300.0, help="Temperature K (default 300)")
+    p_md.add_argument("--dt", type=float, default=1.0, help="Timestep fs (default 1.0)")
     p_md.add_argument(
-        "--report", type=int, default=100, help="Report / trajectory interval in steps (default 100)"
+        "--report",
+        type=int,
+        default=100,
+        help="Report / trajectory interval in steps (default 100)",
     )
     p_md.add_argument("--dcd", default=None, help="Optional DCD output path")
-    p_md.add_argument("--platform", default=None,
-                      help="OpenMM platform name (e.g. CUDA, CPU)")
+    p_md.add_argument("--platform", default=None, help="OpenMM platform name (e.g. CUDA, CPU)")
     p_md.add_argument(
         "--ani-threads", type=int, default=None, help="Override Torch thread count for ANI force"
     )
-    p_md.add_argument("--seed", type=int, default=None,
-                      help="Random seed for integrator RNG")
-    p_md.add_argument("--no-min", action="store_true",
-                      help="Skip energy minimization")
+    p_md.add_argument("--seed", type=int, default=None, help="Random seed for integrator RNG")
+    p_md.add_argument("--no-min", action="store_true", help="Skip energy minimization")
     p_md.add_argument(
         "--dtype",
         default="float64",
@@ -172,8 +152,7 @@ def main(argv: list[str] | None = None):
     p_md.add_argument(
         "--no-traj", action="store_true", help="Do not collect in-memory trajectory frames"
     )
-    p_md.add_argument("--json", action="store_true",
-                      help="Emit JSON summary instead of text")
+    p_md.add_argument("--json", action="store_true", help="Emit JSON summary instead of text")
 
     args = parser.parse_args(argv)
 
@@ -183,8 +162,7 @@ def main(argv: list[str] | None = None):
 
     effective_level = "DEBUG" if args.debug else args.log_level.upper()
     logging.basicConfig(
-        level=getattr(logging, effective_level,
-                      logging.DEBUG if args.debug else logging.WARNING)
+        level=getattr(logging, effective_level, logging.DEBUG if args.debug else logging.WARNING)
     )
     if args.debug:
         # Reduce noise from third-party debug spew so our provenance stands out
@@ -200,7 +178,7 @@ def main(argv: list[str] | None = None):
     log.debug("CLI args: %s", vars(args))
 
     # Lazy import heavy torch/openmm dependent modules after env tweaks
-    from .ani import ani_energy_forces, list_available_ani_models, load_ani_model  # noqa: WPS433
+    from .ani import ani_energy_forces, list_available_ani_models, load_ani_model
 
     if args.cmd == "models":
         models = list_available_ani_models()
@@ -245,7 +223,7 @@ def main(argv: list[str] | None = None):
         return 0
 
     if args.cmd == "ala2-md":
-        from .alanine_dipeptide import simulate_alanine_dipeptide  # noqa: WPS433
+        from .alanine_dipeptide import simulate_alanine_dipeptide
 
         if args.json:
             # Suppress internal stdout (reporter + initial potential) so we emit pure JSON
@@ -284,8 +262,7 @@ def main(argv: list[str] | None = None):
             )
             extra = ""
             if "initial_potential_kjmol" in sim_info:
-                delta = sim_info["final_potential_kjmol"] - \
-                    sim_info["initial_potential_kjmol"]
+                delta = sim_info["final_potential_kjmol"] - sim_info["initial_potential_kjmol"]
                 extra = f" initial_potential={sim_info['initial_potential_kjmol']:.2f} delta={delta:.2f}"
             print(
                 f"Finished steps={sim_info['steps']} model={sim_info['model']} final_potential={sim_info['final_potential_kjmol']:.2f} kJ/mol{extra}"
@@ -314,7 +291,7 @@ def main(argv: list[str] | None = None):
 
     if args.cmd == "md":
         # Lazy import MD runner only when needed
-        from .openmm_runner import run_ani_md  # noqa: WPS433
+        from .openmm_runner import run_ani_md
 
         atoms = smiles_to_ase(args.smiles)
         md_res = run_ani_md(
@@ -344,7 +321,9 @@ def main(argv: list[str] | None = None):
                         "final_potential_kjmol": md_res.final_potential_kjmol,
                         "final_temperature_K": md_res.final_temperature_K,
                         "dcd_path": md_res.dcd_path,
-                        "n_frames": None if md_res.positions is None else int(md_res.positions.shape[0]),
+                        "n_frames": (
+                            None if md_res.positions is None else int(md_res.positions.shape[0])
+                        ),
                     }
                 )
             )
