@@ -167,6 +167,12 @@ def build_ani_torch_force(
     try:  # pragma: no cover - attribute assignment safety
         setattr(tf, "_animm_traced_dtype", key[2])
         setattr(tf, "_animm_cache_hit", cache_hit)
+        # Also attach the species list (atomic numbers) for debugging/tests
+        try:
+            species_list = species.squeeze(0).tolist()
+        except Exception:
+            species_list = None  # type: ignore[assignment]
+        setattr(tf, "_animm_species", species_list)
     except Exception:  # pragma: no cover
         pass
     log.debug(
