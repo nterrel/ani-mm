@@ -27,7 +27,8 @@ def test_species_tensor_uses_atomic_numbers():
             top, model_name="ANI2DR", dtype="float64", cache=True
         )
     except ImportError:
-        pytest.skip("TorchForce / openmm-torch not available in this test environment")
+        pytest.skip(
+            "TorchForce / openmm-torch not available in this test environment")
 
     # Prefer reading the attached species metadata from the returned TorchForce
     species_list = getattr(tf, "_animm_species", None)
@@ -38,13 +39,15 @@ def test_species_tensor_uses_atomic_numbers():
         for key, traced in _TRACED_CACHE.items():
             if key[0] == "ANI2DR" and key[1] == 5:
                 try:
-                    species = traced.original_module.species  # type: ignore[attr-defined]
+                    # type: ignore[attr-defined]
+                    species = traced.original_module.species
                 except AttributeError:
                     continue
                 species_list = species.squeeze(0).tolist()
                 break
         if not species_list:
-            pytest.fail("Could not determine species from TorchForce or cache for (ANI2DR, 5)")
+            pytest.fail(
+                "Could not determine species from TorchForce or cache for (ANI2DR, 5)")
 
     # Expect atomic numbers: Carbon=6, Hydrogen=1
     assert set(species_list) == {6, 1}
